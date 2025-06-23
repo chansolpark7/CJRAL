@@ -1,3 +1,4 @@
 import json
 
-#박찬솔 ㅄ
+for i in range(10):
+    print(i)
