@@ -24,3 +24,14 @@ depot, destination을 표시
 -> 경로마다 택배차 빈공간 남은 정도 표시 (함수형식으로 몇 % 남았다)
 
 파일 여러 개 만들어서 github 이용해서 commit하고 수정하고 이런 거 해야 함
+
+
+공부 계획
+github
+dijkstra
+A star
+TSP
+dynamic programing
+heuristic
+ACE
+GA
