@@ -23,20 +23,26 @@ VRP
 
 시뮬레이션
 
+################################################################################
 
-시각화 - 문정현
-pygame
-matplotlib
-depot, destination을 표시
+시각화
+matplotlib or pygame
+1. depot, destination 점 표시
+- main.read_map()으로 depot, destinations 받아올 수 있음
+
+2. 차량 경로 선으로 표시
+- main.solve_VRP()으로 Vehicle 리스트 받아올 수 있음
+- 각 객체를 객체.route로 경로 볼 수 있음
+- 객체.route[index] = destination_id 구조
 -> 알고리즘 결과물 선으로 표시
 -> 비용같은 거를 선의 굵기? 색깔? 이런 걸로 표시
 -> 경로마다 택배차 빈공간 남은 정도 표시 (함수형식으로 몇 % 남았다)
 
-파일 여러 개 만들어서 github 이용해서 commit하고 수정하고 이런 거 해야 함
 
 
 공부 계획
 github 
+파일 여러 개 만들어서 github 이용해서 commit하고 수정하고 이런 거 해야 함
 
 dijkstra
 A star
