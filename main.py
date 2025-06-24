@@ -1,6 +1,24 @@
 import json
 from collections import defaultdict
 
+class Vehicle:
+    def __init__(self, route, OD_matrix):
+        self.route = route
+        self.cost = 0
+        self.box = []
+
+        self.calculate_cost(OD_matrix)
+
+    def calculate_cost(self, OD_matrix):
+        length = len(self.route)
+        for i in range(length-1):
+            start = self.route[i]
+            end = self.route[i+1]
+            self. cost += OD_matrix[start][end]
+
+    def sort_box(self):
+        pass
+
 def read_map():
     with open('Data_Set.json', 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)

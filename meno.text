@@ -1,8 +1,17 @@
 프로젝트 계획
 
-
+O
 json 파일 불러오기
 
+X
+경로 <-> 박스 배치 ?
+- 박스 배치 최대 수까지 고려해서 경로 설정
+- shuffling을 늘리는 대신 박스를 더 채우는 경우?
+- 
+
+박스 배치 알고리즘
+- 미리 조합 전처리?
+- 백트레킹?
 
 VRP
 휴리스틱 알고리즘
@@ -27,7 +36,8 @@ depot, destination을 표시
 
 
 공부 계획
-github O
+github 
+
 dijkstra
 A star
 TSP

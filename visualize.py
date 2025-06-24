@@ -10,15 +10,16 @@ import pygame
 # - depo = {'longtitude': ~, 'latitude': ~}
 # - destinations[destination_id] = {'longtitude': ~, 'latitude': ~}
 
-def show():
-    size = (600, 600)
+# pygame
+# def show():
+#     size = (600, 600)
 
-    pygame.init()
-    screen = pygame.display.set_mode(size)
+#     pygame.init()
+#     screen = pygame.display.set_mode(size)
 
-    clock = pygame.time.Clock()
+#     clock = pygame.time.Clock()
 
-    depot, destinations = main.read_map()
+#     depot, destinations = main.read_map()
 
-    while True:
-        clock.tick(60)
+#     while True:
+#         clock.tick(60)
