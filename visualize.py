@@ -2,6 +2,7 @@ import main
 import pygame
 import matplotlib.pyplot as plt
 import random
+import sys
 
 # 여기다 시각화
 
@@ -23,7 +24,7 @@ import random
 
 #     while True:
 #         clock.tick(60)
-
+print(sys.path)
 
 depot = main.read_map() 
 destinations = main.read_map()
@@ -73,3 +74,4 @@ class Vehicle:
 
     def capacity_left(self):
         return int(100 * (self.capacity - self.load) / self.capacity)
+    
