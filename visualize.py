@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import random
 import sys
 
+print(sys.path)
 # 여기다 시각화
 
 # main의 어떤 함수를 이용해서 depo, destinations 정보 불러오는 구조
@@ -26,15 +27,16 @@ import sys
 #         clock.tick(60)
 print(sys.path)
 
-depot = main.read_map() 
-destinations = main.read_map()
+depot, destinations = main.read_map() 
 vehicles = main.solve_VRP()
-
+# print(depot)
+# print(destinations)
 def plot_vrp(depot, destinations, vehicles):
     plt.figure(figsize=(10, 8))
 
     # depot 그리기
-    plt.scatter(depot[0], depot[1], c='red', marker='s', s=200, label='Depot')
+    print(depot)
+    plt.scatter(depot['longitude'], depot['latitude'], c='red', marker='s', s=200, label='Depot')
 
     # destination 그리기
     for dest_id, (x, y) in destinations.items():
