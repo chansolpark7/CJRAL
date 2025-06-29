@@ -10,34 +10,48 @@ import numpy as np
 # - depo = {'longtitude': ~, 'latitude': ~}
 # - destinations[destination_id] = {'longtitude': ~, 'latitude': ~}
 
-def show_box(box_list):
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
+class box_viewer:
+    def __init__(self, callback):
+        self.fig = plt.figure(figsize=(10, 8))
+        self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)
+        self.fig.canvas.mpl_connect('key_press_event', callback)
+        self.ax = self.fig.add_subplot(111, projection='3d')
+        self.ax.set_xlim([0, 16])
+        self.ax.set_ylim([-28, 0])
+        self.ax.set_zlim([0, 18])
 
-    for box, size in box_list:
-        # box: {'x': ..., 'y': ..., 'z': ..., 'dx': ..., 'dy': ..., 'dz': ...}
-        x, y, z = box
-        dx, dy, dz = size
-        # Draw a 3D box as a rectangular prism
-        xx = [x, x+dx, x+dx, x, x]
-        yy = [y, y, y+dy, y+dy, y]
-        kwargs = {'alpha': 0.5}
-        # Bottom face
-        ax.plot3D(xx, yy, [z]*5, color='b', **kwargs)
-        # Top face
-        ax.plot3D(xx, yy, [z+dz]*5, color='r', **kwargs)
-        # Vertical lines
-        for i in range(4):
-            ax.plot3D([xx[i], xx[i]], [yy[i], yy[i]], [z, z+dz], color='g', **kwargs)
+        self.ax.set_xlabel('X')
+        self.ax.set_ylabel('Y')
+        self.ax.set_zlabel('Z')
+        plt.title('3D Box Visualization')
+        self.lines = []
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.title('3D Box Visualization')
-    plt.show()
+    def update(self, box_list):
+        for line in self.lines:
+            line.remove()
+        self.lines = []
 
-def histogram(data, bins=30):
-    plt.hist(data, bins=30, color='skyblue', edgecolor='black')
+        for position, size in box_list:
+            x, y, z = position
+            dx, dy, dz = size
+            # Draw a 3D box as a rectangular prism
+            xx = [x, x+dx, x+dx, x, x]
+            yy = [-y, -y, -y-dy, -y-dy, -y]
+            kwargs = {'alpha': 0.5}
+            # Bottom face
+            self.lines += self.ax.plot3D(xx, yy, [z]*5, color='b', **kwargs)
+            # Top face
+            self.lines += self.ax.plot3D(xx, yy, [z+dz]*5, color='r', **kwargs)
+            # Vertical lines
+            for i in range(4):
+                self.lines += self.ax.plot3D([xx[i], xx[i]], [yy[i], yy[i]], [z, z+dz], color='g', **kwargs)
+        plt.draw()
+
+    def show(self):
+        plt.show()
+
+def histogram(data, start=0, end=1, bins=30):
+    plt.hist(data, bins=30, color='skyblue', edgecolor='black', range=(start, end))
     plt.title('Histogram Example')
     plt.xlabel('Value')
     plt.ylabel('Frequency')
@@ -81,4 +95,5 @@ def plot_vrp():
     plt.grid(True)
     plt.show()
     
-plot_vrp()
+if __name__ == "__main__":
+    plot_vrp()
