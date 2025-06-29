@@ -1,10 +1,9 @@
 import main
-import pygame
 import matplotlib.pyplot as plt
 import random
 import sys
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 
 # main의 어떤 함수를 이용해서 depo, destinations 정보 불러오는 구조
 # main.read_map() -> [depo, destinations]
