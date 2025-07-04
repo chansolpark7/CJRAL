@@ -1,5 +1,5 @@
 import json
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 # from ortools.constraint_solver import routing_enums_pb2, pywrapcp
 import random
 import visualize
