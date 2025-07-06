@@ -3,6 +3,7 @@ from collections import defaultdict, namedtuple
 # from ortools.constraint_solver import routing_enums_pb2, pywrapcp
 import random
 import visualize
+import time
 
 box_info = [
     [30, 40, 30],
@@ -10,14 +11,16 @@ box_info = [
     [50, 60, 50]
 ]
 
+Point = namedtuple('Point', ['longitude', 'latitude'])
+
 def read_map():
     with open('Data_Set.json', 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
-    depot = raw_data['depot']['location']
+    depot = Point(**raw_data['depot']['location'])
     destinations = dict()
     for destination in raw_data['destinations']:
-        destinations[destination['destination_id']] = destination['location']
+        destinations[destination['destination_id']] = Point(**destination['location'])
 
     return depot, destinations
 
@@ -73,7 +76,7 @@ class Vehicle:
                 for dz in range(size_z):
                     self.used[x+dx][y+dy][z+dz] = False
 
-    def get_depth(self):
+    def get_depth(self, show=False):
         depth = [[0] * self.Z for _ in range(self.X)]
         for x in range(self.X):
             for z in range(self.Z):
@@ -82,15 +85,21 @@ class Vehicle:
                         depth[x][z] = y+1
                         break
 
+        if show:
+            for z in range(self.Z - 1, -1, -1):
+                for x in range(self.X):
+                    print(f'{depth[x][z]:>4d}', end='')
+                print()
         return depth
 
     def calc_possible_volume(self):
         volume = [[self.Y] * self.Z for _ in range(self.X)]
         depth = self.get_depth()
-        # for x in range(self.X):
-        #     for z in range(self.Z-2, -1, -1):
-        #         depth[x][z] = max(depth[x][z], depth[x][z+1])
+        for x in range(self.X):
+            for z in range(self.Z-2, -1, -1):
+                depth[x][z] = max(depth[x][z], depth[x][z+1])
         size_x = 3
+        size_y = 3
         size_z = 3
         for x in range(self.X-size_x+1):
             for z in range(self.Z-size_z+1):
@@ -98,6 +107,7 @@ class Vehicle:
                 for dx in range(size_x):
                     for dz in range(size_z):
                         volume[x+dx][z+dz] = min(volume[x+dx][z+dz], d)
+                if volume[x][z] > self.Y - size_y: volume[x][z] = self.Y
 
         return self.total_volume - 1000 * sum([sum(i) for i in volume])
 
@@ -203,8 +213,12 @@ def main():
     boxes = random_boxes(100)
     print(boxes)
 
+    t = time.time()
     v = Vehicle([], OD_matrix)
     v.load_box_greedy(boxes)
+    v.get_depth(True)
+    print('time :', time.time() - t)
+
     print(v.box_list)
     print(v.box_num)
     
@@ -218,10 +232,16 @@ def main():
     print(r)
 
     index = v.box_num
-    viewer = visualize.box_viewer(handle)
+    viewer = visualize.box_viewer_3d(handle)
     viewer.update(v.box_list)
     viewer.show()
 
 
 if __name__ == '__main__':
     main()
+
+# [2, 1, 1, 0, 0, 0, 0, 1, 1, 0, 2, 0, 2, 2, 2, 0, 1, 0, 0, 2, 2, 2, 0, 0, 2, 0, 1, 0, 0, 2, 2, 2, 1, 0, 2, 2, 1, 1, 2, 2, 2, 0, 2, 1, 1, 1, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 2, 2, 2, 1, 0, 0, 1, 0, 0, 2, 1, 1, 1, 1, 2, 0, 2, 2, 1, 2, 0, 0, 1, 2, 0, 1, 0, 2, 2, 1, 1, 1, 0, 2, 1, 1, 1, 1, 2]
+# [2, 2, 1, 0, 2, 0, 2, 0, 1, 0, 0, 2, 0, 1, 1, 0, 2, 2, 0, 1, 1, 2, 1, 0, 2, 2, 0, 0, 0, 1, 0, 2, 1, 1, 2, 2, 0, 2, 2, 0, 0, 1, 2, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 2, 0, 1, 1, 1, 1, 1, 2, 0, 1, 2, 1, 2, 1, 1, 2, 0, 1, 2, 1, 0, 0, 1, 2, 2, 0, 0, 1, 0]
+
+# 잘 쌓은 예시
+# [0, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 0, 1, 2, 2, 1, 1, 2, 2, 0, 2, 2, 0, 1, 0, 0, 2, 1, 0, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 0, 1, 0, 2, 1, 1, 0, 2, 2, 2, 0, 2, 2, 2, 2, 1, 2, 0, 1, 2, 0, 2, 2, 1, 0, 1, 1, 0, 1, 1, 2, 0, 0, 2, 0, 0, 2, 2, 0, 0, 1, 0, 0, 2, 0, 2, 0, 1, 2, 0, 2, 1, 1, 1, 2, 1, 1, 0, 0, 2, 0]

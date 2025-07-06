@@ -10,7 +10,7 @@ import numpy as np
 # - depo = {'longtitude': ~, 'latitude': ~}
 # - destinations[destination_id] = {'longtitude': ~, 'latitude': ~}
 
-class box_viewer:
+class box_viewer_3d:
     def __init__(self, callback):
         self.fig = plt.figure(figsize=(10, 8))
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)
@@ -50,6 +50,38 @@ class box_viewer:
     def show(self):
         plt.show()
 
+class box_viewer_2d:
+    def __init__(self, callback):
+        self.fig = plt.figure(figsize=(10, 8))
+        self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)
+        self.fig.canvas.mpl_connect('key_press_event', callback)
+        self.ax = self.fig.add_subplot(111)
+        self.ax.set_xlim([0, 16])
+        self.ax.set_ylim([-28, 0])
+        plt.gca().set_aspect('equal', adjustable='box')
+
+        self.ax.set_xlabel('X')
+        self.ax.set_ylabel('Y')
+        plt.title('2D Box Visualization')
+        self.lines = []
+
+    def update(self, box_list):
+        for line in self.lines:
+            line.remove()
+        self.lines = []
+
+        for position, size in box_list:
+            x, y = position
+            dx, dy = size
+            xx = [x, x+dx, x+dx, x, x]
+            yy = [-y, -y, -y-dy, -y-dy, -y]
+            kwargs = {'alpha': 0.5}
+            self.lines += self.ax.plot(xx, yy, color='rg'[(11, 9).index(dx+dy)], **kwargs)
+        plt.draw()
+
+    def show(self):
+        plt.show()
+
 def histogram(data, start=0, end=1, bins=30):
     plt.hist(data, bins=30, color='skyblue', edgecolor='black', range=(start, end))
     plt.title('Histogram Example')
@@ -64,12 +96,12 @@ def plot_vrp():
     plt.figure(figsize=(10, 8))
 
     # depot 그리기
-    plt.scatter(depot['longitude'], depot['latitude'], c='red', marker='s', s=100, label='Depot')
+    plt.scatter(depot.longitude, depot.latitude, c='red', marker='s', s=100, label='Depot')
 
     # destination 그리기
     for dest_id, pos in destinations.items(): # dest_id에 'D_00001' 이런 거 담기고 pos에 {'longitude': 0, 'latitude': 0} 이런 거 담김
-        x = pos['longitude']
-        y = pos['latitude']
+        x = pos.longitude
+        y = pos.latitude
         plt.scatter(x, y, c='blue')
         plt.text(x + 0.3, y + 0.3, str(dest_id), fontsize=9)
 
