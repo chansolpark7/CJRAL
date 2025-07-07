@@ -4,6 +4,7 @@ from collections import defaultdict, namedtuple
 import random
 import visualize
 import time
+import numpy
 
 box_info = [
     [30, 40, 30],
@@ -48,6 +49,7 @@ class Vehicle:
         self.route = route
         self.cost = 0
         self.used = [[[False]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
+        self.depth = [[0] * self.Z for _ in range(self.X)]
         self.box_list = []
         self.box_num = 0
 
@@ -67,6 +69,9 @@ class Vehicle:
             for dy in range(size_y):
                 for dz in range(size_z):
                     self.used[x+dx][y+dy][z+dz] = True
+        for dx in range(size_x):
+            for dz in range(size_z):
+                self.depth[x+dx][z+dz] = max(self.depth[x+dx][z+dz], y+size_y)
 
     def unload_box_at(self, position, size):
         x, y, z = position
@@ -75,35 +80,42 @@ class Vehicle:
             for dy in range(size_y):
                 for dz in range(size_z):
                     self.used[x+dx][y+dy][z+dz] = False
-
-    def get_depth(self, show=False):
-        depth = [[0] * self.Z for _ in range(self.X)]
-        for x in range(self.X):
-            for z in range(self.Z):
-                for y in range(self.Y-1, -1, -1):
-                    if self.used[x][y][z]:
-                        depth[x][z] = y+1
+        for dx in range(size_x):
+            for dz in range(size_z):
+                for depth_y in range(self.Y-1, -1, -1):
+                    if self.used[x+dx][depth_y][z+dz]:
+                        self.depth[x+dx][z+dz] = depth_y+1
                         break
+                else:
+                    self.depth[x+dx][z+dz] = 0
 
-        if show:
-            for z in range(self.Z - 1, -1, -1):
-                for x in range(self.X):
-                    print(f'{depth[x][z]:>4d}', end='')
-                print()
-        return depth
+    def print_depth(self):
+        # self.depth = [[0] * self.Z for _ in range(self.X)]
+        # for x in range(self.X):
+        #     for z in range(self.Z):
+        #         for y in range(self.Y-1, -1, -1):
+        #             if self.used[x][y][z]:
+        #                 self.depth[x][z] = y+1
+        #                 break
+
+        for z in range(self.Z - 1, -1, -1):
+            for x in range(self.X):
+                print(f'{self.depth[x][z]:>4d}', end='')
+            print()
+        # return self.depth
 
     def calc_possible_volume(self):
         volume = [[self.Y] * self.Z for _ in range(self.X)]
-        depth = self.get_depth()
         for x in range(self.X):
+            volume[x][self.Z-1] = self.depth[x][self.Z-1]
             for z in range(self.Z-2, -1, -1):
-                depth[x][z] = max(depth[x][z], depth[x][z+1])
+                volume[x][z] = max(self.depth[x][z], volume[x][z+1])
         size_x = 3
         size_y = 3
         size_z = 3
         for x in range(self.X-size_x+1):
             for z in range(self.Z-size_z+1):
-                d = max([max(i[z:z+size_z]) for i in depth[x:x+size_x]])
+                d = max([max(i[z:z+size_z]) for i in volume[x:x+size_x]])
                 for dx in range(size_x):
                     for dz in range(size_z):
                         volume[x+dx][z+dz] = min(volume[x+dx][z+dz], d)
@@ -132,11 +144,10 @@ class Vehicle:
     def load_box_greedy(self, boxes):
         def get_possible_positions(size):
             size_x, size_y, size_z = size
-            depth = self.get_depth()
             positions = []
             for x in range(self.X-size_x+1):
                 for z in range(self.Z-size_z+1):
-                    y = max([max(i[z:z+size_z]) for i in depth[x:x+size_x]])
+                    y = max([max(i[z:z+size_z]) for i in self.depth[x:x+size_x]])
                     if y + size_y >= self.Y: continue
                     if z == 0:
                         positions.append((x, y, z))
@@ -153,6 +164,9 @@ class Vehicle:
 
         # 30x40x30, 30x50x40, 50x60x50cm
         # 160*280*180 x y z
+
+        possible_volume_data = []
+        empty_volume_data = []
 
         self.box_num = 0
         for info in boxes:
@@ -174,7 +188,12 @@ class Vehicle:
                 self.load_box_at(best_fit_position, best_fit_size)
                 self.box_list.append((best_fit_position, best_fit_size))
                 self.box_num += 1
+
+                possible_volume_data.append(best_fit_possible_volume)
+                empty_volume_data.append(self.calc_empty_volume())
             else: break
+
+        return possible_volume_data, empty_volume_data
 
 def solve_VRP():
     vehicles = []
@@ -200,6 +219,7 @@ def main():
             index = min(index+1, v.box_num)
         elif event.key == 'left':
             index = max(index-1, 0)
+        print(index)
         viewer.update(v.box_list[:index])
 
     depot, destinations = read_map()
@@ -211,12 +231,14 @@ def main():
     # vehicles = solve_VRP()
 
     boxes = random_boxes(100)
+    # boxes = [0, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 0, 1, 2, 2, 1, 1, 2, 2, 0, 2, 2, 0, 1, 0, 0, 2, 1, 0, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 0, 1, 0, 2, 1, 1, 0, 2, 2, 2, 0, 2, 2, 2, 2, 1, 2, 0, 1, 2, 0, 2, 2, 1, 0, 1, 1, 0, 1, 1, 2, 0, 0, 2, 0, 0, 2, 2, 0, 0, 1, 0, 0, 2, 0, 2, 0, 1, 2, 0, 2, 1, 1, 1, 2, 1, 1, 0, 0, 2, 0]
+    # boxes = [2, 1, 1, 0, 0, 0, 0, 1, 1, 0, 2, 0, 2, 2, 2, 0, 1, 0, 0, 2, 2, 2, 0, 0, 2, 0, 1, 0, 0, 2, 2, 2, 1, 0, 2, 2, 1, 1, 2, 2, 2, 0, 2, 1, 1, 1, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 2, 2, 2, 1, 0, 0, 1, 0, 0, 2, 1, 1, 1, 1, 2, 0, 2, 2, 1, 2, 0, 0, 1, 2, 0, 1, 0, 2, 2, 1, 1, 1, 0, 2, 1, 1, 1, 1, 2]
     print(boxes)
 
     t = time.time()
     v = Vehicle([], OD_matrix)
-    v.load_box_greedy(boxes)
-    v.get_depth(True)
+    possible_volume_data, empty_volume_data = v.load_box_greedy(boxes)
+    v.print_depth()
     print('time :', time.time() - t)
 
     print(v.box_list)
@@ -230,6 +252,8 @@ def main():
     print(v.calc_possible_volume())
     r = v.calc_filled_volume()/v.total_volume
     print(r)
+
+    visualize.graph(possible = possible_volume_data, empty = empty_volume_data)
 
     index = v.box_num
     viewer = visualize.box_viewer_3d(handle)
