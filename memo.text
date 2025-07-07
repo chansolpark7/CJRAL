@@ -16,6 +16,7 @@ X
 VRP
 휴리스틱 알고리즘
 택배 분할
+박스 적재 multi processing로 병렬화
 
 
 엑셀 처리

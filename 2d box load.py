@@ -150,8 +150,7 @@ def main():
     print(r)
     
     index = v.box_num
-    viewer = visualize.box_viewer_2d(handle)
-    viewer.update(v.box_list)
+    viewer = visualize.box_viewer_2d(v.box_list)
     viewer.show()
 
 if __name__ == "__main__":

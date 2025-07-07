@@ -5,6 +5,7 @@ import sys
 import numpy as np
 # from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from matplotlib.widgets import Slider
 
 # main의 어떤 함수를 이용해서 depo, destinations 정보 불러오는 구조
 # main.read_map() -> [depo, destinations]
@@ -12,34 +13,48 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 # - destinations[destination_id] = {'longtitude': ~, 'latitude': ~}
 
 class box_viewer_3d:
-    def __init__(self, callback, mode=1):
+    def __init__(self, box_list, mode=1):
         self.fig = plt.figure(figsize=(10, 8))
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)
-        self.fig.canvas.mpl_connect('key_press_event', callback)
+        self.fig.canvas.mpl_connect('key_press_event', self.key_callback)
         self.ax = self.fig.add_subplot(111, projection='3d')
         self.ax.set_xlim([0, 16])
         self.ax.set_ylim([-28, 0])
         self.ax.set_zlim([0, 18])
-        plt.gca().set_aspect('equal', adjustable='box')
+        self.ax.set_box_aspect([16, 28, 18])
 
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')
         plt.title('3D Box Visualization')
 
+        plt.subplots_adjust(bottom=0.25)
+        self.slider_ax = self.fig.add_axes([0.1, 0.1, 0.8, 0.03])
+        self.slider = Slider(self.slider_ax, 'Time', 0, len(box_list), valinit=len(box_list), valstep=1)
+        self.slider.on_changed(self.update)
+
+        self.box_list = box_list
         self.mode = mode
         self.lines = []
         self.artists = []
 
         self.colors = [[random.random() * 0.7 + 0.3 for _ in range(3)] for _ in range(100)]
+        self.update(self.slider.val)
 
-    def update(self, box_list):
+    def key_callback(self, event):
+        val = int(self.slider.val)
+        if event.key == 'right' and val < self.slider.valmax:
+            self.slider.set_val(val + 1)
+        elif event.key == 'left' and val > self.slider.valmin:
+            self.slider.set_val(val - 1)
+
+    def update(self, value):
         if self.mode == 0: # line
             for line in self.lines:
                 line.remove()
             self.lines = []
 
-            for position, size in box_list:
+            for position, size in self.box_list[:value]:
                 x, y, z = position
                 dx, dy, dz = size
                 y, dy = -y, -dy
@@ -59,7 +74,7 @@ class box_viewer_3d:
                 artist.remove()
             self.artists = []
 
-            for index, (position, size) in enumerate(box_list):
+            for index, (position, size) in enumerate(self.box_list[:value]):
                 x, y, z = position
                 dx, dy, dz = size
                 y, dy = -y, -dy  # y축 반전
@@ -97,10 +112,10 @@ class box_viewer_3d:
         plt.show()
 
 class box_viewer_2d:
-    def __init__(self, callback):
+    def __init__(self, box_list):
         self.fig = plt.figure(figsize=(10, 8))
         self.fig.canvas.mpl_disconnect(self.fig.canvas.manager.key_press_handler_id)
-        self.fig.canvas.mpl_connect('key_press_event', callback)
+        self.fig.canvas.mpl_connect('key_press_event', self.key_callback)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_xlim([0, 16])
         self.ax.set_ylim([-28, 0])
@@ -109,20 +124,38 @@ class box_viewer_2d:
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         plt.title('2D Box Visualization')
+
+        plt.subplots_adjust(bottom=0.25)
+        self.slider_ax = self.fig.add_axes([0.1, 0.1, 0.8, 0.03])
+        self.slider = Slider(self.slider_ax, 'Time', 0, len(box_list), valinit=len(box_list), valstep=1)
+        self.slider.on_changed(self.update)
+
+        self.box_list = box_list
         self.lines = []
 
-    def update(self, box_list):
+        self.colors = [[random.random() * 0.7 + 0.3 for _ in range(3)] for _ in range(100)]
+        self.update(self.slider.val)
+
+    def key_callback(self, event):
+        val = int(self.slider.val)
+        if event.key == 'right' and val < self.slider.valmax:
+            self.slider.set_val(val + 1)
+        elif event.key == 'left' and val > self.slider.valmin:
+            self.slider.set_val(val - 1)
+
+    def update(self, val):
         for line in self.lines:
             line.remove()
         self.lines = []
 
-        for position, size in box_list:
+        for position, size in self.box_list[:val]:
             x, y = position
             dx, dy = size
+            y, dy = -y, -dy
             xx = [x, x+dx, x+dx, x, x]
-            yy = [-y, -y, -y-dy, -y-dy, -y]
+            yy = [y, y, y+dy, y+dy, y]
             kwargs = {'alpha': 0.5}
-            self.lines += self.ax.plot(xx, yy, color='rg'[(11, 9).index(dx+dy)], **kwargs)
+            self.lines += self.ax.plot(xx, yy, color='rg'[(11, 9).index(sum(size))], **kwargs)
         plt.draw()
 
     def show(self):

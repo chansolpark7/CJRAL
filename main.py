@@ -213,15 +213,6 @@ def get_possible_orientations(info):
         return (5, 5, 6), (5, 6, 5), (6, 5, 5)
 
 def main():
-    def handle(event):
-        nonlocal index
-        if event.key == 'right':
-            index = min(index+1, v.box_num)
-        elif event.key == 'left':
-            index = max(index-1, 0)
-        print(index)
-        viewer.update(v.box_list[:index])
-
     depot, destinations = read_map()
     OD_matrix = read_OD_matrix()
     
@@ -255,9 +246,7 @@ def main():
 
     visualize.graph(possible = possible_volume_data, empty = empty_volume_data)
 
-    index = v.box_num
-    viewer = visualize.box_viewer_3d(handle)
-    viewer.update(v.box_list)
+    viewer = visualize.box_viewer_3d(v.box_list)
     viewer.show()
 
 
