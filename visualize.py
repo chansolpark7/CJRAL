@@ -180,34 +180,41 @@ def graph(**datas):
     plt.show()
 
 def plot_vrp():
-    depot, destinations = main.read_map()
-    vehicles = main.solve_VRP()
+    destinations, name_to_index, index_to_name = main.read_map()
+    n = len(destinations)
+    OD_matrix = main.read_OD_matrix(n, name_to_index)
+    orders = main.read_orders(n, name_to_index)
+    vehicles = main.VRP(n, OD_matrix, orders)
     plt.figure(figsize=(10, 8))
 
     # depot 그리기
-    plt.scatter(depot.longitude, depot.latitude, c='red', marker='s', s=100, label='Depot')
+    plt.scatter(destinations['Depot'].longitude, destinations['Depot'].latitude, c='red', marker='s', s=100, label='Depot')
 
     # destination 그리기
-    for dest_id, pos in destinations.items(): # dest_id에 'D_00001' 이런 거 담기고 pos에 {'longitude': 0, 'latitude': 0} 이런 거 담김
+    for dest_id, pos in list(destinations.items())[1:]: # dest_id에 'D_00001' 이런 거 담기고 pos에 {'longitude': 0, 'latitude': 0} 이런 거 담김
         x = pos.longitude
         y = pos.latitude
         plt.scatter(x, y, c='blue')
         # plt.text(x, y, str(dest_id), fontsize=9)
 
     # 차량 경로 그리기
-    # for vehicle in vehicles:
-    #     route = vehicle.route
-    #     coords = [depot] + [destinations[i] for i in route] + [depot]
+    for vehicle in vehicles:
+        route = vehicle.route
+        x_vals = []
+        y_vals = []
+        for route_index in vehicle.route:
+            destination_id = index_to_name[route_index]
+            destination = destinations[destination_id]
+            # coords.append((destination.longitude, destination.latitude))
+            x_vals.append(destination.longitude)
+            y_vals.append(destination.latitude)
 
-    #     x_vals = [pt[0] for pt in coords]
-    #     y_vals = [pt[1] for pt in coords]
+        # 색상과 선 굵기 설정
+        color = [random.random() for _ in range(3)]  # 랜덤 색
+        thickness = max(1, 5 - vehicle.calc_possible_volume()/vehicle.total_volume*5)  # 빈공간 20%마다 1씩 줄어듦
 
-    #     # 색상과 선 굵기 설정
-    #     color = [random.random() for _ in range(3)]  # 랜덤 색
-    #     thickness = max(1, 5 - vehicle.capacity_left() // 20)  # 빈공간 20%마다 1씩 줄어듦
-
-    #     plt.plot(x_vals, y_vals, color=color, linewidth=thickness,
-    #              label=f'Vehicle {vehicle.id} ({vehicle.capacity_left()}% left)')
+        plt.plot(x_vals, y_vals, color=color, linewidth=thickness,
+                 label=f'Vehicle ({vehicle.calc_possible_volume()/vehicle.total_volume*5}% left)')
 
     plt.title('Vehicle Routing Problem')
     plt.xlabel('X')
