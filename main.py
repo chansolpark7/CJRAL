@@ -261,7 +261,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
-    search_parameters.time_limit.seconds = 60
+    search_parameters.time_limit.seconds = 10
 
     solution = routing.SolveWithParameters(search_parameters)
     if not solution:
@@ -310,6 +310,26 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
     print(f'total cost : {total_cost:,}')
     return vehicles
 
+def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[Order], index_to_name):
+    wb = openpyxl.Workbook()
+    ws = wb.create_sheet()
+    ws = wb.active
+    ws.append(['Vehicle_ID', 'Route_Order', 'Destination', 'Order_Number', 'Box_ID', 'Stacking_Order', 'Lower_Left_X', 'Lower_Left_Y', 'Lower_Left_Z', 'Longitude', 'Latitude', 'Box_Width', 'Box_Length', 'Box_Height'])
+    for vehicle_id, vehicle in enumerate(vehicles):
+        ws.append([vehicle_id, 1, 'Depot'])
+        route_order = 2
+        box_index = vehicle.placed_box_num-1
+        for route_index in vehicle.route[1:-1]:
+            destination_id = index_to_name[route_index]
+            destination = destinations[destination_id]
+            for order in orders[route_index]:
+                box_position, box_size = vehicle.placed_boxes[box_index]
+                ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index, *map(lambda x: x*10, box_position), destination.longitude, destination.latitude, *map(lambda x: x*10, box_size)])
+                route_order += 1
+                box_index -= 1
+        ws.append([vehicle_id, route_order, 'Depot'])
+    wb.save("Result.xlsx")
+
 def main():
     destinations, name_to_index, index_to_name = read_map()
     n = len(destinations)
@@ -332,6 +352,7 @@ def main():
         viewer = visualize.box_viewer_3d(vehicle.placed_boxes)
         viewer.show()
 
+    save(vehicles, destinations, orders, index_to_name)
 
 if __name__ == '__main__':
     main()
