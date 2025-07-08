@@ -192,7 +192,7 @@ def plot_vrp():
         x = pos.longitude
         y = pos.latitude
         plt.scatter(x, y, c='blue')
-        plt.text(x + 0.3, y + 0.3, str(dest_id), fontsize=9)
+        # plt.text(x, y, str(dest_id), fontsize=9)
 
     # 차량 경로 그리기
     # for vehicle in vehicles:
