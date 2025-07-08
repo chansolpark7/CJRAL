@@ -262,7 +262,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
-    search_parameters.time_limit.seconds = 10#*60
+    search_parameters.time_limit.seconds = 10*60
 
     solution = routing.SolveWithParameters(search_parameters)
     if not solution:
