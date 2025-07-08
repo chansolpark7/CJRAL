@@ -2,11 +2,12 @@ import time
 import math
 import numpy
 import json
+import sys
 import openpyxl
 from collections import defaultdict, namedtuple
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
-import visualize
+# import visualize
 
 Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
@@ -28,8 +29,8 @@ def get_possible_orientations(info):
     else:
         return (5, 5, 6), (5, 6, 5), (6, 5, 5)
 
-def read_map():
-    with open('Data_Set.json', 'rt', encoding='utf-8') as file:
+def read_map(filename='Data_Set.json'):
+    with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
     destinations = dict()
@@ -46,8 +47,8 @@ def read_map():
 
     return destinations, name_to_index, index_to_name
 
-def read_OD_matrix(n, name_to_index):
-    with open('distance-data.txt', 'rt', encoding='utf-8') as file:
+def read_OD_matrix(n, name_to_index, filename='distance-data.txt'):
+    with open(filename, 'rt', encoding='utf-8') as file:
         file.readline()
         OD_matrix = [[0]*n for _ in range(n)]
         while True:
@@ -63,8 +64,8 @@ def read_OD_matrix(n, name_to_index):
 
     return OD_matrix
 
-def read_orders(n, name_to_index):
-    with open('Data_Set.json', 'rt', encoding='utf-8') as file:
+def read_orders(n, name_to_index, filename='Data_Set.json'):
+    with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
     orders = [[] for _ in range(n)]
@@ -261,7 +262,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
-    search_parameters.time_limit.seconds = 10
+    search_parameters.time_limit.seconds = 10#*60
 
     solution = routing.SolveWithParameters(search_parameters)
     if not solution:
@@ -286,7 +287,7 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
             demands[i] += box_volume[order.info]
     total_demand = sum(demands)
 
-    min_load_ratio = 0.50
+    min_load_ratio = 0.40
     max_load_ratio = 0.50
     min_vehicle_num = math.ceil(total_demand / Vehicle.total_volume)
     max_vehicle_num = math.ceil(total_demand / (Vehicle.total_volume * min_load_ratio))
@@ -297,15 +298,16 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
     solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, depot=0)
 
     if not routes:
-        print("❌ 경로를 찾지 못했습니다.")
+        print("route not found")
         return
 
     total_cost = 0
     vehicles = []
     for i, route in enumerate(routes):
-        vehicle = Vehicle(route, OD_matrix, orders)
-        total_cost += int(vehicle.dist*0.5) + 150000
-        vehicles.append(vehicle)
+        if len(route) != 2:
+            vehicle = Vehicle(route, OD_matrix, orders)
+            vehicles.append(vehicle)
+            total_cost += int(vehicle.dist*0.5) + 150000
 
     print(f'total cost : {total_cost:,}')
     return vehicles
@@ -330,11 +332,11 @@ def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[O
         ws.append([vehicle_id, route_order, 'Depot'])
     wb.save("Result.xlsx")
 
-def main():
-    destinations, name_to_index, index_to_name = read_map()
+def main(data_filename, distance_filename):
+    destinations, name_to_index, index_to_name = read_map(data_filename)
     n = len(destinations)
-    OD_matrix = read_OD_matrix(n, name_to_index)
-    orders = read_orders(n, name_to_index)
+    OD_matrix = read_OD_matrix(n, name_to_index, distance_filename)
+    orders = read_orders(n, name_to_index, data_filename)
 
     t = time.time()
     vehicles = VRP(n, OD_matrix, orders)
@@ -345,14 +347,14 @@ def main():
         print(vehicle.boxes)
         filled_volume = vehicle.calc_filled_volume()
         print(f'ratio : {filled_volume/vehicle.total_volume}')
-        if vehicle.box_num != vehicle.placed_box_num:
-            print('load failed')
-            print(vehicle.box_num, vehicle.placed_box_num)
+        print(vehicle.box_num, vehicle.placed_box_num)
+        assert vehicle.box_num == vehicle.placed_box_num, 'load fail'
         print()
-        viewer = visualize.box_viewer_3d(vehicle.placed_boxes)
-        viewer.show()
+        # viewer = visualize.box_viewer_3d(vehicle.placed_boxes)
+        # viewer.show()
 
     save(vehicles, destinations, orders, index_to_name)
 
 if __name__ == '__main__':
-    main()
+    data_filename, distance_filename = sys.argv[1:]
+    main(data_filename, distance_filename)
