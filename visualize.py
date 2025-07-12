@@ -155,7 +155,7 @@ class box_viewer_2d:
             xx = [x, x+dx, x+dx, x, x]
             yy = [y, y, y+dy, y+dy, y]
             kwargs = {'alpha': 0.5}
-            self.lines += self.ax.plot(xx, yy, color='rg'[(11, 9).index(sum(size))], **kwargs)
+            self.lines += self.ax.plot(xx, yy, color='rg'[(10, 7).index(sum(size))], **kwargs)
         plt.draw()
 
     def show(self):

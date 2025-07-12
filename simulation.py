@@ -147,6 +147,7 @@ def on_key(event):
 
 fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
+fig.canvas.mpl_disconnect(fig.canvas.manager.key_press_handler_id)
 fig.canvas.mpl_connect('key_press_event', on_key)
 
 spawn_new_box()

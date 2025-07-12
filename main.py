@@ -355,6 +355,7 @@ def main(data_filename, distance_filename):
 
     save(vehicles, destinations, orders, index_to_name)
 
+# python311 main.py Data_Set.json distance-data.txt
 if __name__ == '__main__':
     data_filename, distance_filename = sys.argv[1:]
     main(data_filename, distance_filename)

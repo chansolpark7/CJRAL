@@ -10,15 +10,15 @@ def dist(a, b):
 
     return ((bx-ax)**2 + (by-ay)**2) ** 0.5
 
-depot, destinations = main.read_map()
-OD_matrix = main.read_OD_matrix()
-orders = main.read_orders()
+destinations, name_to_index, index_to_name = main.read_map()
+n = len(destinations)
+OD_matrix = main.read_OD_matrix(n, name_to_index)
+orders = main.read_orders(n, name_to_index)
 
 # 유클리드 거리, 이동 길이 비율
 dist_sum = 0
 meter_sum = 0
-all_pos = ['Depot'] + list(destinations.keys())
-destinations['Depot'] = depot
+all_pos = list(destinations.keys())
 print(all_pos)
 n = len(all_pos)
 for i in range(n):
@@ -27,7 +27,7 @@ for i in range(n):
         if i == j: continue
         b = all_pos[j]
         dist_sum += dist(destinations[a], destinations[b])
-        meter_sum += OD_matrix[a][b][1]
+        meter_sum += OD_matrix[i][j]
 
 print(dist_sum / (n*(n-1)))
 print(meter_sum / (n*(n-1)))
@@ -41,7 +41,7 @@ for i in range(n):
         if i == j: continue
         a = all_pos[i]
         b = all_pos[j]
-        d = OD_matrix[a][b].meter
+        d = OD_matrix[i][j]
         if d < 1000:
             count += 1
         data.append(d)
@@ -61,9 +61,9 @@ for i, j, k in tri.simplices:
     a, b, c = all_pos[i], all_pos[j], all_pos[k]  # 3개의 점
 
     # 각 변의 거리 계산 (a-b, b-c, c-a)
-    d1 = OD_matrix[a][b].meter
-    d2 = OD_matrix[b][c].meter
-    d3 = OD_matrix[c][a].meter
+    d1 = OD_matrix[i][j]
+    d2 = OD_matrix[j][k]
+    d3 = OD_matrix[k][i]
 
     # 하나라도 1000m 미만이면 count 증가
     if d1 < 1000 or d2 < 1000 or d3 < 1000:

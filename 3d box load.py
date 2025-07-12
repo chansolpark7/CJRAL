@@ -17,8 +17,8 @@ class Vehicle:
     def __init__(self, route, OD_matrix):
         self.route = route
         self.cost = 0
-        self.used = [[[False]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
-        self.depth = [[0] * self.Z for _ in range(self.X)]
+        self.used = numpy.zeros((self.X, self.Y, self.Z), dtype=int)
+        self.depth = numpy.zeros((self.X, self.Z), dtype=int)
         self.box_list = []
         self.box_num = 0
 
@@ -34,21 +34,13 @@ class Vehicle:
     def load_box_at(self, position, size):
         x, y, z = position
         size_x, size_y, size_z = size
-        for dx in range(size_x):
-            for dy in range(size_y):
-                for dz in range(size_z):
-                    self.used[x+dx][y+dy][z+dz] = True
-        for dx in range(size_x):
-            for dz in range(size_z):
-                self.depth[x+dx][z+dz] = max(self.depth[x+dx][z+dz], y+size_y)
+        self.used[x:x+size_x, y:y+size_y, z:z+size_z] = 1
+        self.depth[x:x+size_x, z:z+size_z] = numpy.maximum(self.depth[x:x+size_x, z:z+size_z], y+size_y)
 
     def unload_box_at(self, position, size):
         x, y, z = position
         size_x, size_y, size_z = size
-        for dx in range(size_x):
-            for dy in range(size_y):
-                for dz in range(size_z):
-                    self.used[x+dx][y+dy][z+dz] = False
+        self.used[x:x+size_x, y:y+size_y, z:z+size_z] = 0
         for dx in range(size_x):
             for dz in range(size_z):
                 for depth_y in range(self.Y-1, -1, -1):
@@ -65,41 +57,25 @@ class Vehicle:
             print()
 
     def calc_possible_volume(self):
-        volume = [[self.Y] * self.Z for _ in range(self.X)]
-        for x in range(self.X):
-            volume[x][self.Z-1] = self.depth[x][self.Z-1]
-            for z in range(self.Z-2, -1, -1):
-                volume[x][z] = max(self.depth[x][z], volume[x][z+1])
+        volume = self.depth.copy()
+        for z in range(self.Z-2, -1, -1):
+            volume[:, z] = numpy.maximum(self.depth[:, z], volume[:, z+1])
         size_x = 3
         size_y = 3
         size_z = 3
         for x in range(self.X-size_x+1):
             for z in range(self.Z-size_z+1):
-                d = max([max(i[z:z+size_z]) for i in volume[x:x+size_x]])
-                for dx in range(size_x):
-                    for dz in range(size_z):
-                        volume[x+dx][z+dz] = min(volume[x+dx][z+dz], d)
-                if volume[x][z] > self.Y - size_y: volume[x][z] = self.Y
+                d = volume[x:x+size_x, z:z+size_z].max()
+                volume[x:x+size_x, z:z+size_z] = numpy.minimum(volume[x:x+size_x, z:z+size_z], d)
+        volume[volume > self.Y - size_y] = self.Y
 
-        return self.total_volume - 1000 * sum([sum(i) for i in volume])
-
-    def calc_empty_volume(self):
-        volume = 0
-        for x in range(self.X):
-            for y in range(self.Y):
-                for z in range(self.Z):
-                    if not self.used[x][y][z]: volume += 1000
-
-        return volume
+        return self.total_volume - 1000 * volume.sum()
 
     def calc_filled_volume(self):
-        volume = 0
-        for x in range(self.X):
-            for y in range(self.Y):
-                for z in range(self.Z):
-                    if self.used[x][y][z]: volume += 1000
+        return self.used.sum()*1000
 
-        return volume
+    def calc_empty_volume(self):
+        return self.total_volume - self.calc_filled_volume()
 
     def load_box_greedy(self, boxes):
         def get_possible_positions(size):
@@ -107,18 +83,12 @@ class Vehicle:
             positions = []
             for x in range(self.X-size_x+1):
                 for z in range(self.Z-size_z+1):
-                    y = max([max(i[z:z+size_z]) for i in self.depth[x:x+size_x]])
-                    if y + size_y >= self.Y: continue
+                    y = self.depth[x:x+size_x, z:z+size_z].max()
+                    if y + size_y > self.Y: continue
                     if z == 0:
                         positions.append((x, y, z))
                     else:
-                        for dx in range(size_x):
-                            for dy in range(size_y):
-                                if self.used[x+dx][y+dy][z-1]: break
-                            else: continue
-
-                            positions.append((x, y, z))
-                            break
+                        if self.used[x:x+size_x, y:y+size_y, z-1].sum() != 0: positions.append((x, y, z))
 
             return positions
 
@@ -133,9 +103,10 @@ class Vehicle:
             best_fit_size = None
             best_fit_position = None
             best_fit_possible_volume = -1
+            count = 0
             for size in get_possible_orientations(info):
                 positions = get_possible_positions(size)
-                if len(positions) == 0: continue
+                count += len(positions)
                 for position in positions:
                     self.load_box_at(position, size)
                     possible_volume = self.calc_possible_volume()
@@ -144,6 +115,7 @@ class Vehicle:
                         best_fit_size = size
                         best_fit_position = position
                         best_fit_possible_volume = possible_volume
+            print(f'{count=}')
             if best_fit_position != None:
                 self.load_box_at(best_fit_position, best_fit_size)
                 self.box_list.append((best_fit_position, best_fit_size))
