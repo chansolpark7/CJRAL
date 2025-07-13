@@ -2,9 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import json
+from math import radians, cos, sin, asin, sqrt
+
 
 def make_id(idx):
     return f"D_{idx:05d}"
+
 
 def generate_city_network(total_points=500, seed=None):
     if seed is not None:
@@ -27,11 +30,9 @@ def generate_city_network(total_points=500, seed=None):
         cy = random.randint(400, 600)
         main_city_coords.append((cx, cy))
 
-        # 남은 포인트 중 일부만 할당
         if i < num_main_cities - 1:
             points_for_this_city = total_points // num_main_cities
         else:
-            # 마지막 도시에는 남은 모든 포인트 몰아주기
             points_for_this_city = remaining_points
 
         remaining_points -= points_for_this_city
@@ -40,14 +41,12 @@ def generate_city_network(total_points=500, seed=None):
         n_subcity = int(points_for_this_city * 0.4)
         n_midtown = points_for_this_city - (n_center + n_subcity)
 
-        # 중심 도시 클러스터
         for _ in range(n_center):
             x = np.random.normal(cx, scale=25)
             y = np.random.normal(cy, scale=25)
             delivery_points.append((make_id(current_id), x, y))
             current_id += 1
 
-        # 소도시
         num_subcities = random.randint(3, 6)
         angles = np.linspace(0, 2 * np.pi, num_subcities, endpoint=False)
         random.shuffle(angles)
@@ -61,14 +60,12 @@ def generate_city_network(total_points=500, seed=None):
             sub_y = cy + dist * np.sin(theta)
             road_lines.append(((cx, cy), (sub_x, sub_y)))
 
-            # 소도시 클러스터
             for _ in range(subcity_points):
                 x = np.random.normal(sub_x, scale=20)
                 y = np.random.normal(sub_y, scale=20)
                 delivery_points.append((make_id(current_id), x, y))
                 current_id += 1
 
-            # 도로 중간도시 클러스터
             num_midtowns = random.randint(1, 2)
             for i in range(1, num_midtowns + 1):
                 mid_x = cx + (dist * i / (num_midtowns + 1)) * np.cos(theta) + np.random.normal(0, 10)
@@ -79,7 +76,6 @@ def generate_city_network(total_points=500, seed=None):
                     delivery_points.append((make_id(current_id), x, y))
                     current_id += 1
 
-    # 부족한 개수 채우기
     while len(delivery_points) < total_points:
         x = random.uniform(300, 700)
         y = random.uniform(300, 700)
@@ -88,6 +84,7 @@ def generate_city_network(total_points=500, seed=None):
 
     return delivery_points, main_city_coords, road_lines
 
+
 def plot_city_network(delivery_points, road_lines):
     xs = [p[1] for p in delivery_points]
     ys = [p[2] for p in delivery_points]
@@ -95,7 +92,6 @@ def plot_city_network(delivery_points, road_lines):
     plt.figure(figsize=(12, 10))
     plt.scatter(xs, ys, s=40, c='skyblue', edgecolors='k', label="Delivery Point")
 
-    # 출발지(Depot)
     depot_x, depot_y = 500, 500
     plt.scatter(depot_x, depot_y, s=250, c='red', marker='*', label='Depot')
 
@@ -116,7 +112,6 @@ def convert_to_json(delivery_points, filename='additional_data.json'):
     base_lon, base_lat = 129.0750875, 35.17982005
     scale = 0.0002
 
-    # 목적지 좌표 변환
     destinations = []
     for dest_id, x, y in delivery_points:
         lon = base_lon + (x - base_x) * scale
@@ -129,7 +124,6 @@ def convert_to_json(delivery_points, filename='additional_data.json'):
             }
         })
 
-    # 주문 정보 생성
     box_sizes = [
         {"width": 30, "length": 40, "height": 30},
         {"width": 50, "length": 60, "height": 50},
@@ -140,7 +134,7 @@ def convert_to_json(delivery_points, filename='additional_data.json'):
     order_number = 1
     box_number = 1
     for dest in destinations:
-        num_boxes = random.randint(1, 2)  # 1~2개
+        num_boxes = random.randint(1, 2)
         for _ in range(num_boxes):
             size = random.choice(box_sizes)
             orders.append({
@@ -152,7 +146,6 @@ def convert_to_json(delivery_points, filename='additional_data.json'):
             order_number += 1
             box_number += 1
 
-    # JSON 구성
     data = {
         "depot": {
             "destination": "Depot",
@@ -174,9 +167,61 @@ def convert_to_json(delivery_points, filename='additional_data.json'):
         json.dump(data, f, indent=2, ensure_ascii=False)
     print(f"[✅] JSON saved to '{filename}'")
 
-# 실행
+
+def haversine(lon1, lat1, lon2, lat2):
+    R = 6371.0
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    distance_km = R * c
+    return distance_km * 1000
+
+
+def export_distance_table(delivery_points, filename='additional_distance_data.txt'):
+    base_x, base_y = 500, 500
+    base_lon, base_lat = 129.0750875, 35.17982005
+    scale = 0.0002
+    destinations = []
+    for dest_id, x, y in delivery_points:
+        lon = base_lon + (x - base_x) * scale
+        lat = base_lat + (y - base_y) * scale
+        destinations.append({
+            "id": dest_id,
+            "lon": lon,
+            "lat": lat
+        })
+
+    header = f"{'ORIGIN':<10}\t{'DESTINATION':<12}\t{'TIME_MIN':>10}\t{'DISTANCE_METER':>15}\n"
+    lines = [header]
+    avg_speed_kmph = 25
+
+    for i in range(len(destinations)):
+        for j in range(len(destinations)):
+            if i == j:
+                continue
+            origin = destinations[i]
+            dest = destinations[j]
+            dist = haversine(origin["lon"], origin["lat"], dest["lon"], dest["lat"]) * (random.random() + 1)
+            time_min = dist / (avg_speed_kmph * 1000 / 60)
+            lines.append(
+                f"{origin['id']:<10}\t"
+                f"{dest['id']:<12}\t"
+                f"{time_min:10.3f}\t"
+                f"{int(round(dist)):15d}\n"
+            )
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+    print(f"[✅] Distance table saved to '{filename}'")
+
+
+
 if __name__ == "__main__":
     total_delivery_points = int(input("Enter total number of delivery points: "))
-    points, mains, roads = generate_city_network(total_delivery_points, seed=None)  # 랜덤한 결과
+    points, mains, roads = generate_city_network(total_delivery_points, seed=None)
     plot_city_network(points, roads)
     convert_to_json(points)
+    export_distance_table(points)

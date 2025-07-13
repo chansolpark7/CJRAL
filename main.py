@@ -22,7 +22,19 @@ box_size = [
 
 box_volume = [i[0]*i[1]*i[2] for i in box_size]
 
+<<<<<<< HEAD
+def get_possible_orientations(info):
+    if info == 0:
+        return (3, 3, 4), (3, 4, 3), (4, 3, 3)
+    elif info == 1:
+        return (3, 4, 5), (3, 5, 4), (4, 3, 5), (4, 5, 3), (5, 3, 4), (5, 4, 3)
+    else:
+        return (5, 5, 6), (5, 6, 5), (6, 5, 5)
+
+def read_map(filename='additional_data.json'):
+=======
 def read_map(filename='Data_Set.json'):
+>>>>>>> cb3f5f192a7f85fefe41ed034c341c28a36a2f65
     with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
@@ -40,7 +52,7 @@ def read_map(filename='Data_Set.json'):
 
     return destinations, name_to_index, index_to_name
 
-def read_OD_matrix(n, name_to_index, filename='distance-data.txt'):
+def read_OD_matrix(n, name_to_index, filename='additional_distance_data.txt'):
     with open(filename, 'rt', encoding='utf-8') as file:
         file.readline()
         OD_matrix = [[0]*n for _ in range(n)]
@@ -57,7 +69,7 @@ def read_OD_matrix(n, name_to_index, filename='distance-data.txt'):
 
     return OD_matrix
 
-def read_orders(n, name_to_index, filename='Data_Set.json'):
+def read_orders(n, name_to_index, filename='additional_data.json'):
     with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
