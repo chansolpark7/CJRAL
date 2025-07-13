@@ -117,12 +117,12 @@ def solution1(boxes):
     for index in range(n, 0, -1):
         prev_i, prev_j = prev[index][i][j]
         if prev_i == i:
-            path.append(2)
-        else:
             path.append(1)
+        else:
+            path.append(0)
         i, j = prev_i, prev_j
     path.reverse()
-    # print(path)
+
     return sum(boxes)/(answer*18)
 
 def solution2(boxes):
@@ -132,7 +132,6 @@ def solution2(boxes):
     dp = [[[INF]*19 for _ in range(19)] for _ in range(n + 1)]
     prev = [[[None]*19 for _ in range(19)] for _ in range(n + 1)]
     dp[0][0][0] = 0
-
 
     for index in range(n):
         size = boxes[index]
@@ -144,56 +143,72 @@ def solution2(boxes):
                         dp[index + 1][j][size] = dp[index][i][j] + 1
                         prev[index + 1][j][size] = (i, j)
                 else:
-                    if dp[index + 1][i + size][j] > dp[index][i][j]:
-                        dp[index + 1][i + size][j] = dp[index][i][j]
+                    if dp[index + 1][i + size][j] > dp[index][i][j] + (i == 0):
+                        dp[index + 1][i + size][j] = dp[index][i][j] + (i == 0)
                         prev[index + 1][i + size][j] = (i, j)
                 if j + size > 18:
                     pass
                 else:
-                    if dp[index + 1][i][j + size] > dp[index][i][j]:
-                        dp[index + 1][i][j + size] = dp[index][i][j]
+                    if dp[index + 1][i][j + size] > dp[index][i][j] + (j == 0):
+                        dp[index + 1][i][j + size] = dp[index][i][j] + (j == 0)
                         prev[index + 1][i][j + size] = (i, j)
 
-    answer = INF
-    for i in range(19):
-        for j in range(19):
-            if dp[n][i][j] != -1:
-                answer = min(answer, dp[n][i][j] + int(i != 0) + int(j != 0))
+    answer = min(min(arr) for arr in dp[n])
+    print(answer)
 
-    # print(answer)
+    best_i, best_j = None, None
+    best_score = -1
     for i in range(19):
         for j in range(19):
-            if dp[n][i][j] + int(i != 0) + int(j != 0) == answer: break
-        else: continue
-        break
+            if dp[n][i][j] == answer:
+                score = (18 - i if i <= 15 else 0) + (18 - j if j <= 15 else 0)
+                if score > best_score:
+                    best_i, best_j = i, j
+                    best_score = score
 
     path = []
+    box_index = answer-1
+    i, j = best_i, best_j
+    print(i, j)
     for index in range(n, 0, -1):
+        size = boxes[index-1]
         prev_i, prev_j = prev[index][i][j]
-        if prev_i == i:
-            path.append(2)
+        if prev_i == i and prev_j + size == j:
+            path.append(box_index)
         else:
-            path.append(1)
+            if prev_i + size > 18:
+                path.append(box_index)
+                box_index -= 1
+            else:
+                path.append(box_index-1)
         i, j = prev_i, prev_j
     path.reverse()
-    # print(path)
+
+    li = [0]*answer
+    for index in range(n):
+        li[path[index]] += boxes[index]
+    print(li)
+
     return sum(boxes)/(answer*18)
 
 
 n = 240
 
-data1 = []
-data2 = []
-test = 100
-for _ in range(test):
-    boxes = random_boxes(n)
-    data1.append(solution1(boxes))
-    data2.append(solution2(boxes))
+# data1 = []
+# data2 = []
+# test = 100
+# for _ in range(test):
+#     boxes = random_boxes(n)
+#     data1.append(solution1(boxes))
+#     data2.append(solution2(boxes))
 
-print(min(data1), max(data1))
-print(sum(data1) / test)
-print(min(data2), max(data2))
-print(sum(data2) / test)
+# print(min(data1), max(data1))
+# print(sum(data1) / test)
+# print(min(data2), max(data2))
+# print(sum(data2) / test)
 
+boxes = random_boxes(n)
+# boxes = [3, 5, 5, 5, 3, 3, 5, 5, 3, 5]
+print(boxes)
 # print(solution1(boxes))
-# print(solution2(boxes))
+print(solution2(boxes))

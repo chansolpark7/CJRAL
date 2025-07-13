@@ -125,7 +125,84 @@ class Vehicle:
                 self.box_num += 1
             else: break
 
-    def load_box_bnb(self, boxes):
+    def load_box_bnb(self, boxes_3d):
+        # b1 b2 전처리
+        b1b2_boxes = [3 if i == 0 else 5 for i in boxes_3d if i != 2]
+        def solution(boxes):
+            n = len(boxes)
+            INF = 300
+
+            dp = [[[INF]*19 for _ in range(19)] for _ in range(n + 1)]
+            prev = [[[None]*19 for _ in range(19)] for _ in range(n + 1)]
+            dp[0][0][0] = 0
+
+            for index in range(n):
+                size = boxes[index]
+                for i in range(19):
+                    for j in range(19):
+                        if dp[index][i][j] == INF: continue
+                        if i + size > 18:
+                            if dp[index + 1][j][size] > dp[index][i][j] + 1:
+                                dp[index + 1][j][size] = dp[index][i][j] + 1
+                                prev[index + 1][j][size] = (i, j)
+                        else:
+                            if dp[index + 1][i + size][j] > dp[index][i][j] + (i == 0):
+                                dp[index + 1][i + size][j] = dp[index][i][j] + (i == 0)
+                                prev[index + 1][i + size][j] = (i, j)
+                        if j + size > 18:
+                            pass
+                        else:
+                            if dp[index + 1][i][j + size] > dp[index][i][j] + (j == 0):
+                                dp[index + 1][i][j + size] = dp[index][i][j] + (j == 0)
+                                prev[index + 1][i][j + size] = (i, j)
+
+            answer = min(min(arr) for arr in dp[n])
+
+            best_i, best_j = None, None
+            best_score = -1
+            for i in range(19):
+                for j in range(19):
+                    if dp[n][i][j] == answer:
+                        score = (18 - i if i <= 15 else 0) + (18 - j if j <= 15 else 0)
+                        if score > best_score:
+                            best_i, best_j = i, j
+                            best_score = score
+
+            path = []
+            box_index = answer-1
+            i, j = best_i, best_j
+            for index in range(n, 0, -1):
+                size = boxes[index-1]
+                prev_i, prev_j = prev[index][i][j]
+                if prev_i == i and prev_j + size == j:
+                    path.append(box_index)
+                else:
+                    if prev_i + size > 18:
+                        path.append(box_index)
+                        box_index -= 1
+                    else:
+                        path.append(box_index-1)
+                i, j = prev_i, prev_j
+            path.reverse()
+            return path
+        b1b2_path = solution(b1b2_boxes)
+        b3_path = [i//3 for i in range(len(boxes_3d) - len(b1b2_boxes))]
+
+        boxes = []
+        b1b2_counter = -1
+        b1b2_index = 0
+        b3_counter = -1
+        b3_index = 0
+        for index, info in enumerate(boxes_3d):
+            if info < 2:
+                if b1b2_path[b1b2_index] != b1b2_counter:
+                    boxes.append(0)
+                b1b2_index += 1
+            else:
+                if b3_path[b3_index] != b3_counter:
+                    boxes.append(1)
+                b3_index += 1
+
         answer_volume = 0
         answer_box_list = None
         self.boxes = boxes
@@ -134,12 +211,12 @@ class Vehicle:
         visited = defaultdict(set)
         loading = []
         d = defaultdict(list)
-        for index, info in enumerate(boxes):
+        for index, info in enumerate(boxes): # loading중인 박스 처리 나중에 수정
+            loading.append(d[0] + d[1])
             if info == 0:
                 if len(d[0]) == 1: d[0].pop(0)
             else:
                 if len(d[1]) == 2: d[1].pop(0)
-            loading.append(d[0] + d[1])
             d[info].append(index)
         print(loading)
 
@@ -197,7 +274,7 @@ class Vehicle:
                         else: break
                     else:
                         not_shuffling.append((position, size))
-                if len(not_shuffling) > 2: best_fit_boxes = not_shuffling
+                if len(not_shuffling) > 0: best_fit_boxes = not_shuffling
                 elif index == 0: print(not_shuffling)
                 # best_fit_boxes = not_shuffling
 
@@ -221,7 +298,7 @@ class Vehicle:
 def random_boxes(n):
     boxes = []
     for _ in range(n):
-        boxes.append(random.randint(0, 1))
+        boxes.append(random.randint(0, 2))
     return boxes
 
 def get_possible_orientations(info):
@@ -247,9 +324,9 @@ def main():
     # print(sum(data)/100)
     # visualize.histogram(data)
 
-    # boxes = random_boxes(30)
-    boxes = [0]*20 + [1]*10
-    random.shuffle(boxes)
+    boxes = random_boxes(30)
+    # boxes = [0]*20 + [1]*10
+    # random.shuffle(boxes)
     # boxes = [1]*60
     print(boxes)
 
