@@ -214,7 +214,7 @@ def plot_vrp():
         thickness = max(1, 5 - vehicle.calc_possible_volume()/vehicle.total_volume*5)  # 빈공간 20%마다 1씩 줄어듦
 
         plt.plot(x_vals, y_vals, color=color, linewidth=thickness,
-                 label=f'Vehicle ({vehicle.calc_possible_volume()/vehicle.total_volume*5}% left)')
+                 label=f'Vehicle ({vehicle.calc_possible_volume()/vehicle.total_volume*5: .2f}% left)')
 
     plt.title('Vehicle Routing Problem')
     plt.xlabel('X')
