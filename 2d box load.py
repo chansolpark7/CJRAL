@@ -324,10 +324,10 @@ def main():
     # print(sum(data)/100)
     # visualize.histogram(data)
 
-    boxes = random_boxes(30)
+    # boxes = random_boxes(30)
     # boxes = [0]*20 + [1]*10
     # random.shuffle(boxes)
-    # boxes = [1]*60
+    boxes = [0]*30
     print(boxes)
 
     v = Vehicle()

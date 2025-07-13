@@ -1,11 +1,12 @@
+import openpyxl
+from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+
 import time
 import math
 import numpy
 import json
 import sys
-import openpyxl
-from collections import defaultdict, namedtuple
-from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+from collections import defaultdict, namedtuple, deque
 
 # import visualize
 
@@ -21,6 +22,7 @@ box_size = [
 
 box_volume = [i[0]*i[1]*i[2] for i in box_size]
 
+<<<<<<< HEAD
 def get_possible_orientations(info):
     if info == 0:
         return (3, 3, 4), (3, 4, 3), (4, 3, 3)
@@ -30,6 +32,9 @@ def get_possible_orientations(info):
         return (5, 5, 6), (5, 6, 5), (6, 5, 5)
 
 def read_map(filename='additional_data.json'):
+=======
+def read_map(filename='Data_Set.json'):
+>>>>>>> cb3f5f192a7f85fefe41ed034c341c28a36a2f65
     with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
@@ -77,6 +82,274 @@ def read_orders(n, name_to_index, filename='additional_data.json'):
 
     return orders
 
+class Vehicle2D:
+    X = 16
+    Y = 28
+    total_volume = X*Y*100
+    box_sizes= [
+        (5, 5),
+        (3, 4)
+    ]
+    box_volumes = [i[0]*i[1] for i in box_sizes]
+    TIME_LIMIT = 5
+
+    def __init__(self):
+        self.used = [[False]*self.Y for _ in range(self.X)]
+        self.depth = [0] * self.X
+        self.box_informations = []
+        self.box_num = 0
+        self.loaded_box_position_size = []
+        self.loaded_box_num = 0
+        self.placement_index = []
+        self.b1b2_box_num = 0
+        self.b3_box_num = 0
+
+    def load_box_at(self, position, size):
+        x, y = position
+        size_x, size_y = size
+        for dx in range(size_x):
+            for dy in range(size_y):
+                self.used[x+dx][y+dy] = True
+                self.depth[x+dx] = y+size_y
+
+    def unload_box_at(self, position, size):
+        x, y = position
+        size_x, size_y = size
+        for dx in range(size_x):
+            for dy in range(size_y):
+                self.used[x+dx][y+dy] = False
+        for dx in range(size_x):
+            for depth_y in range(self.Y-1, -1, -1):
+                if self.used[x+dx][depth_y]:
+                    self.depth[x+dx] = depth_y+1
+                    break
+            else:
+                self.depth[x+dx] = 0
+
+    def calc_possible_volume(self):
+        volume = [self.Y]*self.X
+        size_x = 3
+        size_y = 3
+        for x in range(self.X-size_x+1):
+            d = max(self.depth[x:x+size_x])
+            for dx in range(size_x):
+                volume[x+dx] = min(volume[x+dx], d)
+            if volume[x] > self.Y - size_y:volume[x] = self.Y
+
+        return self.total_volume - 100 * sum(volume)
+
+    def calc_empty_volume(self):
+        volume = 0
+        for x in range(self.X):
+            for y in range(self.Y):
+                if not self.used[x][y]: volume += 100
+
+        return volume
+
+    def calc_filled_volume(self):
+        volume = 0
+        for x in range(self.X):
+            for y in range(self.Y):
+                if self.used[x][y]: volume += 100
+
+        return volume
+
+    def get_possible_positions(self, size):
+        size_x, size_y = size
+        positions = []
+        for x in range(self.X-size_x+1):
+            y = max(self.depth[x:x+size_x])
+            if y + size_y > self.Y: continue
+            positions.append((x, y))
+
+        return positions
+
+    def get_possible_orientations(self, info):
+        if info == 0:
+            return (5, 5),
+        else:
+            return (3, 4), (4, 3)
+
+    def load_box_bnb(self, box_information_3d):
+        # b1 b2 전처리
+        b1b2_boxes = [3 if i == 0 else 5 for i in box_information_3d if i != 2]
+        def solution(boxes):
+            n = len(boxes)
+            INF = 300
+
+            dp = [[[INF]*19 for _ in range(19)] for _ in range(n + 1)]
+            prev = [[[None]*19 for _ in range(19)] for _ in range(n + 1)]
+            dp[0][0][0] = 0
+
+            for index in range(n):
+                size = boxes[index]
+                for i in range(19):
+                    for j in range(19):
+                        if dp[index][i][j] == INF: continue
+                        if i + size > 18:
+                            if dp[index + 1][j][size] > dp[index][i][j] + 1:
+                                dp[index + 1][j][size] = dp[index][i][j] + 1
+                                prev[index + 1][j][size] = (i, j)
+                        else:
+                            if dp[index + 1][i + size][j] > dp[index][i][j] + (i == 0):
+                                dp[index + 1][i + size][j] = dp[index][i][j] + (i == 0)
+                                prev[index + 1][i + size][j] = (i, j)
+                        if j + size > 18:
+                            pass
+                        else:
+                            if dp[index + 1][i][j + size] > dp[index][i][j] + (j == 0):
+                                dp[index + 1][i][j + size] = dp[index][i][j] + (j == 0)
+                                prev[index + 1][i][j + size] = (i, j)
+
+            answer = min(min(arr) for arr in dp[n])
+
+            best_i, best_j = None, None
+            best_score = -1
+            for i in range(19):
+                for j in range(19):
+                    if dp[n][i][j] == answer:
+                        score = (18 - i if i <= 15 else 0) + (18 - j if j <= 15 else 0)
+                        if score > best_score:
+                            best_i, best_j = i, j
+                            best_score = score
+
+            path = []
+            box_index = answer-1
+            i, j = best_i, best_j
+            for index in range(n, 0, -1):
+                size = boxes[index-1]
+                prev_i, prev_j = prev[index][i][j]
+                if prev_i == i and prev_j + size == j:
+                    path.append(box_index)
+                else:
+                    if prev_i + size > 18:
+                        path.append(box_index)
+                        box_index -= 1
+                    else:
+                        path.append(box_index-1)
+                i, j = prev_i, prev_j
+            path.reverse()
+            return path
+        b1b2_placement_index = solution(b1b2_boxes)
+        b3_placement_index = [i//3 for i in range(len(box_information_3d) - len(b1b2_boxes))]
+
+        self.box_informations = []
+        self.placement_index = []
+        b1b2_index = 0
+        b3_index = 0
+        counter = dict()
+        for index, info_3d in enumerate(box_information_3d):
+            info_2d = 0 if info_3d == 2 else 1
+            if info_2d == 0:
+                p = b3_placement_index[b3_index]
+                b3_index += 1
+            else:
+                p = b1b2_placement_index[b1b2_index]
+                b1b2_index += 1
+
+            if (info_2d, p) not in counter:
+                counter[(info_2d, p)] = len(counter)
+                self.box_informations.append(info_2d)
+            self.placement_index.append(counter[(info_2d, p)])
+        self.box_num = len(self.box_informations)
+
+        # main
+        answer_volume = 0
+        answer_loaded_box_position_size = None
+        self.b1b2_box_num = 0
+        self.b3_box_num = 0
+        start_t = time.time()
+        visited = defaultdict(set)
+        loading = []
+        loading_queue = [deque(), deque()]
+        for index, info in enumerate(self.box_informations): # loading중인 박스 처리 나중에 수정
+            loading.append(loading_queue[0] + loading_queue[1])
+            if info == 0:
+                if len(loading_queue[0]) == 1: loading_queue[0].popleft()
+            else:
+                if len(loading_queue[1]) == 2: loading_queue[1].popleft()
+            loading_queue[info].append(index)
+
+        def estimate(index):
+            possible_volume = self.calc_possible_volume()
+            volume = 0
+            for info in self.box_informations[index:]:
+                if volume + self.box_volumes[info] <= possible_volume:
+                    volume += self.box_volumes[info]
+                else:
+                    break
+            return volume
+        
+        def dfs(index, volume):
+            nonlocal answer_volume
+            nonlocal answer_loaded_box_position_size
+
+            if time.time() - start_t > self.TIME_LIMIT: return
+            if index == len(self.box_informations): return
+
+            estimated_volume = estimate(index)
+            if volume + estimated_volume <= answer_volume: return
+
+            info = self.box_informations[index]
+            box_volume = self.box_volumes[info]
+
+            best_fit_possible_volume = -1
+            best_fit_box_positions = None
+            best_fit_box_sizes = None
+            for size in self.get_possible_orientations(info):
+                positions = self.get_possible_positions(size)
+                for position in positions:
+                    self.load_box_at(position, size)
+                    self.loaded_box_position_size.append((position, size))
+                    possible_volume = self.calc_possible_volume()
+                    if best_fit_possible_volume < possible_volume:
+                        best_fit_possible_volume = possible_volume
+                        best_fit_box_positions = [position]
+                        best_fit_box_sizes = [size]
+                    elif best_fit_possible_volume == possible_volume:
+                        best_fit_box_positions.append(position)
+                        best_fit_box_sizes.append(size)
+                    self.unload_box_at(position, size)
+                    self.loaded_box_position_size.pop()
+                    if volume + box_volume > answer_volume:
+                        answer_volume = volume + box_volume
+                        answer_loaded_box_position_size = self.loaded_box_position_size + [(position, size)]
+            if best_fit_possible_volume != -1:
+                not_shuffling_positions = []
+                not_shuffling_sizes = []
+                for position, size in zip(best_fit_box_positions, best_fit_box_sizes):
+                    for b_index in loading[index]:
+                        b_info = self.box_informations[b_index]
+                        b_position, b_size = self.loaded_box_position_size[b_index]
+                        if info == b_info == 0: continue
+                        elif position[0] + size[0] <= b_position[0] or b_position[0] + b_size[0] <= position[0]: continue
+                        else: break
+                    else:
+                        not_shuffling_positions.append(position)
+                        not_shuffling_sizes.append(size)
+                if len(not_shuffling_positions) > 0: # 다른 기준?
+                    best_fit_box_positions = not_shuffling_positions
+                    best_fit_box_sizes = not_shuffling_sizes
+
+                for position, size in zip(best_fit_box_positions, best_fit_box_sizes):
+                    if position in visited[size]: continue
+                    self.load_box_at(position, size)
+                    self.loaded_box_position_size.append((position, size))
+                    dfs(index + 1, volume + box_volume)
+                    self.unload_box_at(position, size)
+                    self.loaded_box_position_size.pop()
+                    visited[size].add(position)
+                for position, size in zip(best_fit_box_positions, best_fit_box_sizes):
+                    visited[size].discard(position)
+
+        dfs(0, 0)
+        self.loaded_box_position_size = answer_loaded_box_position_size
+        self.loaded_box_num = len(self.loaded_box_position_size)
+        self.b1b2_box_num = self.box_informations[:len(self.loaded_box_position_size)].count(1)
+        self.b3_box_num = len(self.loaded_box_position_size) - self.b1b2_box_num
+        for position, size in self.loaded_box_position_size:
+            self.load_box_at(position, size)
+
 class Vehicle:
     X = 16
     Y = 28
@@ -88,19 +361,19 @@ class Vehicle:
         self.cost = 0
         self.used = [[[False]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
         self.depth = [[0] * self.Z for _ in range(self.X)]
-        self.boxes = []
+        self.box_informations = []
         self.box_num = 0
-        self.placed_boxes = []
-        self.placed_box_num = 0
+        self.loaded_box_position_size = []
+        self.loaded_box_num = 0
 
         for index in self.route[1:-1]:
             for box in orders[index]:
-                self.boxes.append(box.info)
-        self.box_num = len(self.boxes)
-        self.boxes.reverse()
+                self.box_informations.append(box.info)
+        self.box_num = len(self.box_informations)
+        self.box_informations.reverse()
+        self.box_num = len(self.box_informations)
 
         self.calculate_dist(OD_matrix)
-        self.load_box_greedy()
 
     def calculate_dist(self, OD_matrix):
         length = len(self.route)
@@ -180,41 +453,51 @@ class Vehicle:
 
         return volume
 
-    def load_box_greedy(self):
-        def get_possible_positions(size):
-            size_x, size_y, size_z = size
-            positions = []
-            for x in range(self.X-size_x+1):
-                for z in range(self.Z-size_z+1):
-                    y = max([max(i[z:z+size_z]) for i in self.depth[x:x+size_x]])
-                    if y + size_y >= self.Y: continue
-                    if z == 0:
+    def get_possible_positions(self, size):
+        size_x, size_y, size_z = size
+        positions = []
+        for x in range(self.X-size_x+1):
+            for z in range(self.Z-size_z+1):
+                y = max([max(i[z:z+size_z]) for i in self.depth[x:x+size_x]])
+                if y + size_y >= self.Y: continue
+                if z == 0:
+                    positions.append((x, y, z))
+                else:
+                    for dx in range(size_x):
+                        for dy in range(size_y):
+                            if self.used[x+dx][y+dy][z-1]: break
+                        else: continue
+
                         positions.append((x, y, z))
-                    else:
-                        for dx in range(size_x):
-                            for dy in range(size_y):
-                                if self.used[x+dx][y+dy][z-1]: break
-                            else: continue
+                        break
 
-                            positions.append((x, y, z))
-                            break
+        return positions
 
-            return positions
+    def get_possible_orientations(self, info):
+        if info == 0:
+            return (3, 3, 4), (3, 4, 3), (4, 3, 3)
+        elif info == 1:
+            return (3, 4, 5), (3, 5, 4), (4, 3, 5), (4, 5, 3), (5, 3, 4), (5, 4, 3)
+        else:
+            return (5, 5, 6), (5, 6, 5), (6, 5, 5)
 
+    def load_box_greedy(self, box_informations=None):
         # 30x40x30, 30x50x40, 50x60x50cm
         # 160*280*180 x y z
 
+        if box_informations != None:
+            self.box_informations = box_informations
+            self.box_num = len(self.box_informations)
         possible_volume_data = []
         empty_volume_data = []
 
-        self.placed_box_num = 0
-        for info in self.boxes:
-            best_fit_size = None
+        self.loaded_box_num = 0
+        for info in self.box_informations:
             best_fit_position = None
+            best_fit_size = None
             best_fit_possible_volume = -1
-            for size in get_possible_orientations(info):
-                positions = get_possible_positions(size)
-                if len(positions) == 0: continue
+            for size in self.get_possible_orientations(info):
+                positions = self.get_possible_positions(size)
                 for position in positions:
                     self.load_box_at(position, size)
                     possible_volume = self.calc_possible_volume()
@@ -225,14 +508,32 @@ class Vehicle:
                         best_fit_possible_volume = possible_volume
             if best_fit_position != None:
                 self.load_box_at(best_fit_position, best_fit_size)
-                self.placed_boxes.append((best_fit_position, best_fit_size))
-                self.placed_box_num += 1
+                self.loaded_box_position_size.append((best_fit_position, best_fit_size))
+                self.loaded_box_num += 1
 
                 possible_volume_data.append(best_fit_possible_volume)
                 empty_volume_data.append(self.calc_empty_volume())
             else: break
 
         return possible_volume_data, empty_volume_data
+
+    def load_box_bnb(self, box_informations=None):
+        if box_informations != None:
+            self.box_informations = box_informations
+            self.box_num = len(self.box_informations)
+        vehicle_2d = Vehicle2D()
+        vehicle_2d.load_box_bnb(self.box_informations)
+        height = [0] * vehicle_2d.loaded_box_num
+        for index, info_3d in enumerate(self.box_informations):
+            p = vehicle_2d.placement_index[index]
+            if p >= vehicle_2d.loaded_box_num: continue
+            position_2d, size_2d = vehicle_2d.loaded_box_position_size[p]
+            position_3d = (*position_2d, height[p])
+            size_3d = (*size_2d, [3, 5, 6][info_3d])
+            height[p] += size_3d[2]
+            self.load_box_at(position_3d, size_3d)
+            self.loaded_box_position_size.append((position_3d, size_3d))
+        self.loaded_box_num = len(self.loaded_box_position_size)
 
 def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
     num_vehicles = len(vehicle_capacities)
@@ -287,8 +588,8 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
             demands[i] += box_volume[order.info]
     total_demand = sum(demands)
 
-    min_load_ratio = 0.40
-    max_load_ratio = 0.50
+    min_load_ratio = 0.80
+    max_load_ratio = 0.85
     min_vehicle_num = math.ceil(total_demand / Vehicle.total_volume)
     max_vehicle_num = math.ceil(total_demand / (Vehicle.total_volume * min_load_ratio))
     print(f'vehicle num : {min_vehicle_num} ~ {max_vehicle_num}')
@@ -306,6 +607,7 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
     for i, route in enumerate(routes):
         if len(route) != 2:
             vehicle = Vehicle(route, OD_matrix, orders)
+            vehicle.load_box_bnb()
             vehicles.append(vehicle)
             total_cost += int(vehicle.dist*0.5) + 150000
 
@@ -320,12 +622,12 @@ def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[O
     for vehicle_id, vehicle in enumerate(vehicles):
         ws.append([vehicle_id, 1, 'Depot'])
         route_order = 2
-        box_index = vehicle.placed_box_num-1
+        box_index = vehicle.loaded_box_num-1
         for route_index in vehicle.route[1:-1]:
             destination_id = index_to_name[route_index]
             destination = destinations[destination_id]
             for order in orders[route_index]:
-                box_position, box_size = vehicle.placed_boxes[box_index]
+                box_position, box_size = vehicle.loaded_box_position_size[box_index]
                 ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index, *map(lambda x: x*10, box_position), destination.longitude, destination.latitude, *map(lambda x: x*10, box_size)])
                 route_order += 1
                 box_index -= 1
@@ -344,13 +646,13 @@ def main(data_filename, distance_filename):
 
     for index, vehicle in enumerate(vehicles, 1):
         print(f'Vehicle {index}')
-        print(vehicle.boxes)
+        # print(vehicle.loaded_box_position_size)
         filled_volume = vehicle.calc_filled_volume()
         print(f'ratio : {filled_volume/vehicle.total_volume}')
-        print(vehicle.box_num, vehicle.placed_box_num)
-        assert vehicle.box_num == vehicle.placed_box_num, 'load fail'
+        print(vehicle.loaded_box_num, vehicle.box_num)
+        assert vehicle.loaded_box_num == vehicle.box_num, 'load fail'
         print()
-        # viewer = visualize.box_viewer_3d(vehicle.placed_boxes)
+        # viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
         # viewer.show()
 
     save(vehicles, destinations, orders, index_to_name)
