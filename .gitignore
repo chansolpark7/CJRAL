@@ -1,3 +1,6 @@
 __pycache__/
 *.json
 *.xlsx
+*.txt
+!memo.txt
+!requirements.txt
