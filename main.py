@@ -8,7 +8,7 @@ import json
 import sys
 from collections import defaultdict, namedtuple, deque
 
-# import visualize
+import visualize
 
 Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
@@ -22,19 +22,7 @@ box_size = [
 
 box_volume = [i[0]*i[1]*i[2] for i in box_size]
 
-<<<<<<< HEAD
-def get_possible_orientations(info):
-    if info == 0:
-        return (3, 3, 4), (3, 4, 3), (4, 3, 3)
-    elif info == 1:
-        return (3, 4, 5), (3, 5, 4), (4, 3, 5), (4, 5, 3), (5, 3, 4), (5, 4, 3)
-    else:
-        return (5, 5, 6), (5, 6, 5), (6, 5, 5)
-
-def read_map(filename='additional_data.json'):
-=======
 def read_map(filename='Data_Set.json'):
->>>>>>> cb3f5f192a7f85fefe41ed034c341c28a36a2f65
     with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
@@ -52,7 +40,7 @@ def read_map(filename='Data_Set.json'):
 
     return destinations, name_to_index, index_to_name
 
-def read_OD_matrix(n, name_to_index, filename='additional_distance_data.txt'):
+def read_OD_matrix(n, name_to_index, filename='distance-data.txt'):
     with open(filename, 'rt', encoding='utf-8') as file:
         file.readline()
         OD_matrix = [[0]*n for _ in range(n)]
@@ -69,7 +57,7 @@ def read_OD_matrix(n, name_to_index, filename='additional_distance_data.txt'):
 
     return OD_matrix
 
-def read_orders(n, name_to_index, filename='additional_data.json'):
+def read_orders(n, name_to_index, filename='Data_Set.json'):
     with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
@@ -588,8 +576,10 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
             demands[i] += box_volume[order.info]
     total_demand = sum(demands)
 
-    min_load_ratio = 0.80
-    max_load_ratio = 0.85
+    min_load_ratio = 0.9
+    max_load_ratio = 0.9
+    print(total_demand / Vehicle.total_volume)
+    print(total_demand / (Vehicle.total_volume * min_load_ratio))
     min_vehicle_num = math.ceil(total_demand / Vehicle.total_volume)
     max_vehicle_num = math.ceil(total_demand / (Vehicle.total_volume * min_load_ratio))
     print(f'vehicle num : {min_vehicle_num} ~ {max_vehicle_num}')
@@ -652,12 +642,13 @@ def main(data_filename, distance_filename):
         print(vehicle.loaded_box_num, vehicle.box_num)
         assert vehicle.loaded_box_num == vehicle.box_num, 'load fail'
         print()
-        # viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
-        # viewer.show()
+        viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
+        viewer.show()
 
     save(vehicles, destinations, orders, index_to_name)
 
 # python311 main.py Data_Set.json distance-data.txt
+# python311 main.py additional_data.json additional_distance_data.txt
 if __name__ == '__main__':
     data_filename, distance_filename = sys.argv[1:]
     main(data_filename, distance_filename)

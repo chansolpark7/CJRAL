@@ -180,10 +180,14 @@ def graph(**datas):
     plt.show()
 
 def plot_vrp():
-    destinations, name_to_index, index_to_name = main.read_map()
+    # data_file_name = 'Data_Set.json'
+    # distance_file_name = 'distance-data.txt'
+    data_file_name = 'additional_data.json'
+    distance_file_name = 'additional_distance_data.txt'
+    destinations, name_to_index, index_to_name = main.read_map(data_file_name)
     n = len(destinations)
-    OD_matrix = main.read_OD_matrix(n, name_to_index)
-    orders = main.read_orders(n, name_to_index)
+    OD_matrix = main.read_OD_matrix(n, name_to_index, distance_file_name)
+    orders = main.read_orders(n, name_to_index, data_file_name)
     vehicles = main.VRP(n, OD_matrix, orders)
     plt.figure(figsize=(10, 8))
 
@@ -214,7 +218,7 @@ def plot_vrp():
         thickness = max(1, 5 - vehicle.calc_possible_volume()/vehicle.total_volume*5)  # 빈공간 20%마다 1씩 줄어듦
 
         plt.plot(x_vals, y_vals, color=color, linewidth=thickness,
-                 label=f'Vehicle ({vehicle.calc_possible_volume()/vehicle.total_volume*5: .2f}% left)')
+                 label=f'Vehicle ({vehicle.calc_possible_volume()/vehicle.total_volume*100: .2f}% left)')
 
     plt.title('Vehicle Routing Problem')
     plt.xlabel('X')

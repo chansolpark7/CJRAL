@@ -61,10 +61,12 @@ class Vehicle:
             box_id = data.Box_ID
             self.box_ids.append(box_id)
             if box_id != None:
-                self.box_info[box_id] = Box(
+                box = Box(
                     data.Lower_Left_X//10, data.Lower_Left_Y//10, data.Lower_Left_Z//10,
                     data.Box_Width//10, data.Box_Length//10, data.Box_Height//10
                 )
+                self.box_info[box_id] = box
+                self.load_box(box_id)
 
         self.deliver()
         self.total_cost = self.car_cost + self.travel_cost + self.shuffling_cost
@@ -166,8 +168,10 @@ def judge(data_file_name, distance_file_name):
     print(f'shuffling cost : {shuffling_cost}')
 
 if __name__ == "__main__":
-    data_file_name = 'Data_Set.json'
-    distance_file_name = 'distance-data.txt'
+    # data_file_name = 'Data_Set.json'
+    # distance_file_name = 'distance-data.txt'
+    data_file_name = 'additional_data.json'
+    distance_file_name = 'additional_distance_data.txt'
     assert basename(dirname(__file__)) == 'routing'
 
     start_t = time.time()
