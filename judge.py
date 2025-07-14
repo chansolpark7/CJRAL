@@ -5,6 +5,7 @@ import time
 from collections import namedtuple
 
 import main
+import visualize
 
 Data = namedtuple(
     'Data',
@@ -51,6 +52,7 @@ class Vehicle:
         self.OD_matrix = OD_matrix
 
         self.used = [[[None]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
+        self.loaded_box_position_size = []
         self.shuffling_cost = 0
         self.travel_cost = 0
         self.route = []
@@ -61,13 +63,14 @@ class Vehicle:
             box_id = data.Box_ID
             self.box_ids.append(box_id)
             if box_id != None:
-                box = Box(
-                    data.Lower_Left_X//10, data.Lower_Left_Y//10, data.Lower_Left_Z//10,
-                    data.Box_Width//10, data.Box_Length//10, data.Box_Height//10
-                )
+                position = (data.Lower_Left_X//10, data.Lower_Left_Y//10, data.Lower_Left_Z//10)
+                size = (data.Box_Width//10, data.Box_Length//10, data.Box_Height//10)
+                box = Box(*position, *size)
                 self.box_info[box_id] = box
                 self.load_box(box_id)
+                self.loaded_box_position_size.append((position, size))
 
+        print(self.used)
         self.deliver()
         self.total_cost = self.car_cost + self.travel_cost + self.shuffling_cost
 
@@ -89,6 +92,7 @@ class Vehicle:
             box = self.box_info[box_id]
             x, y, z = box.Lower_Left_X, box.Lower_Left_Y, box.Lower_Left_Z
             size_x, size_y, size_z = box.Box_Width, box.Box_Length, box.Box_Height
+            print(x, y, z, size_x, size_y, size_z)
             for target_z in range(z+size_z, self.Z):
                 for dx in range(size_x):
                     for dy in range(size_y):
@@ -107,6 +111,7 @@ class Vehicle:
                             move_box(other_box)
 
         move_box(box_id)
+        self.shuffling_cost += 500
         box = self.box_info[box_id]
         x, y, z = box.Lower_Left_X, box.Lower_Left_Y, box.Lower_Left_Z
         size_x, size_y, size_z = box.Box_Width, box.Box_Length, box.Box_Height
@@ -124,6 +129,7 @@ class Vehicle:
             self.dist += self.OD_matrix[start][end]
             box_id = self.box_ids[i]
             if box_id != None: self.unload_box(box_id)
+            # print(self.used)
         self.travel_cost = self.dist * 0.5
 
 def judge(data_file_name, distance_file_name):
@@ -161,6 +167,8 @@ def judge(data_file_name, distance_file_name):
         print(vehicle.total_cost)
         print(vehicle.car_cost, vehicle.travel_cost, vehicle.shuffling_cost)
         print()
+        viwer = visualize.box_viewer_3d(vehicle.loaded_box_position_size[::-1])
+        viwer.show()
 
     print(f'total cost : {total_cost}')
     print(f'car cost : {car_cost}')
@@ -168,14 +176,14 @@ def judge(data_file_name, distance_file_name):
     print(f'shuffling cost : {shuffling_cost}')
 
 if __name__ == "__main__":
-    # data_file_name = 'Data_Set.json'
-    # distance_file_name = 'distance-data.txt'
-    data_file_name = 'additional_data.json'
-    distance_file_name = 'additional_distance_data.txt'
-    assert basename(dirname(__file__)) == 'routing'
+    data_file_name = 'Data_Set.json'
+    distance_file_name = 'distance-data.txt'
+    # data_file_name = 'additional_data.json'
+    # distance_file_name = 'additional_distance_data.txt'
+    assert basename(os.getcwd()) == 'routing'
 
     start_t = time.time()
-    os.system(f'python311 main.py {data_file_name} {distance_file_name}')
+    # os.system(f'python311 main.py {data_file_name} {distance_file_name}')
     running_time = time.time() - start_t
 
     print(f'{running_time=}')

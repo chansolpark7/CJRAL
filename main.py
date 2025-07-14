@@ -8,7 +8,7 @@ import json
 import sys
 from collections import defaultdict, namedtuple, deque
 
-import visualize
+# import visualize
 
 Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
@@ -359,7 +359,6 @@ class Vehicle:
                 self.box_informations.append(box.info)
         self.box_num = len(self.box_informations)
         self.box_informations.reverse()
-        self.box_num = len(self.box_informations)
 
         self.calculate_dist(OD_matrix)
 
@@ -618,7 +617,7 @@ def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[O
             destination = destinations[destination_id]
             for order in orders[route_index]:
                 box_position, box_size = vehicle.loaded_box_position_size[box_index]
-                ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index, *map(lambda x: x*10, box_position), destination.longitude, destination.latitude, *map(lambda x: x*10, box_size)])
+                ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index+1, *map(lambda x: x*10, box_position), destination.longitude, destination.latitude, *map(lambda x: x*10, box_size)])
                 route_order += 1
                 box_index -= 1
         ws.append([vehicle_id, route_order, 'Depot'])
@@ -636,14 +635,13 @@ def main(data_filename, distance_filename):
 
     for index, vehicle in enumerate(vehicles, 1):
         print(f'Vehicle {index}')
-        # print(vehicle.loaded_box_position_size)
+        print(vehicle.loaded_box_position_size)
         filled_volume = vehicle.calc_filled_volume()
         print(f'ratio : {filled_volume/vehicle.total_volume}')
-        print(vehicle.loaded_box_num, vehicle.box_num)
         assert vehicle.loaded_box_num == vehicle.box_num, 'load fail'
         print()
-        viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
-        viewer.show()
+        # viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
+        # viewer.show()
 
     save(vehicles, destinations, orders, index_to_name)
 
