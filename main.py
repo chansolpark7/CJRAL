@@ -14,6 +14,9 @@ Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 # Distance = namedtuple('Distance', ['time', 'meter'])
 
+CVRP_TIME_LIMIT = 10*60
+BOX_LOAD_TIME_LIMIT = 5
+
 box_size = [
     [30, 40, 30],
     [30, 50, 40],
@@ -79,7 +82,6 @@ class Vehicle2D:
         (3, 4)
     ]
     box_volumes = [i[0]*i[1] for i in box_sizes]
-    TIME_LIMIT = 5
 
     def __init__(self):
         self.used = [[False]*self.Y for _ in range(self.X)]
@@ -272,7 +274,7 @@ class Vehicle2D:
             nonlocal answer_volume
             nonlocal answer_loaded_box_position_size
 
-            if time.time() - start_t > self.TIME_LIMIT: return
+            if time.time() - start_t > BOX_LOAD_TIME_LIMIT: return
             if index == len(self.box_informations): return
 
             estimated_volume = estimate(index)
@@ -550,7 +552,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
-    search_parameters.time_limit.seconds = 10*60
+    search_parameters.time_limit.seconds = CVRP_TIME_LIMIT
 
     solution = routing.SolveWithParameters(search_parameters)
     if not solution:
@@ -595,7 +597,7 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
     vehicles = []
     for i, route in enumerate(routes):
         if len(route) != 2:
-            vehicle = Vehicle(route[::-1], OD_matrix, orders)
+            vehicle = Vehicle(route, OD_matrix, orders)
             vehicle.load_box_bnb()
             # vehicle.load_box_greedy()
             vehicles.append(vehicle)
