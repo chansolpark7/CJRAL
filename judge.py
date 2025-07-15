@@ -40,7 +40,7 @@ Box = namedtuple(
     ]
 )
 
-class Vehicle:
+class Vehicle: # 다른 좌표계 사용
     X = 16
     Y = 28
     Z = 18
@@ -70,6 +70,7 @@ class Vehicle:
                 self.box_info[box_id] = box
                 self.load_box(box_id)
                 self.loaded_box_position_size.append((position, size))
+        self.loaded_box_position_size.reverse()
 
         # print(self.used)
         self.deliver()
@@ -104,8 +105,8 @@ class Vehicle:
                             if other_box.Destination == exclude: continue
                             self.shuffling_cost += 500
                             moved.add(other_box_id)
-                            # move_box(other_box_id, exclude)
-            for target_y in range(y+size_y, self.Y):
+                            move_box(other_box_id, exclude)
+            for target_y in range(y-1, -1, -1):
                 for dx in range(size_x):
                     for dz in range(size_z):
                         other_box_id = self.used[x+dx][target_y][z+dz]
@@ -116,7 +117,7 @@ class Vehicle:
                             if other_box.Destination == exclude: continue
                             self.shuffling_cost += 500
                             moved.add(other_box_id)
-                            # move_box(other_box_id, exclude)
+                            move_box(other_box_id, exclude)
 
         # self.shuffling_cost += 500
         box = self.box_info[box_id]
@@ -131,14 +132,7 @@ class Vehicle:
     def deliver(self):
         length = len(self.route)
         self.dist = 0
-        # for i in range(length-1):
-        #     start = self.name_to_index[self.route[i]]
-        #     end = self.name_to_index[self.route[i+1]]
-        #     self.dist += self.OD_matrix[start][end]
-        #     box_id = self.box_ids[i]
-        #     if box_id != None: self.unload_box(box_id)
-
-        for i in range(length-2, -1, -1):
+        for i in range(length-1):
             start = self.name_to_index[self.route[i]]
             end = self.name_to_index[self.route[i+1]]
             self.dist += self.OD_matrix[start][end]
@@ -183,7 +177,13 @@ def judge(data_file_name, distance_file_name):
         print(vehicle.total_cost)
         print(vehicle.car_cost, vehicle.travel_cost, vehicle.shuffling_cost)
         print()
-        viwer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
+
+        loaded_box_position_size = []
+        for (x, y, z), (size_x, size_y, size_z) in vehicle.loaded_box_position_size:
+            position = (x, 28-(y+size_y), z)
+            size = (size_x, size_y, size_z)
+            loaded_box_position_size.append((position, size))
+        viwer = visualize.box_viewer_3d(loaded_box_position_size)
         viwer.show()
 
     print(f'total cost : {total_cost}')

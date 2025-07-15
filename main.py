@@ -611,17 +611,17 @@ def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[O
     ws.append(['Vehicle_ID', 'Route_Order', 'Destination', 'Order_Number', 'Box_ID', 'Stacking_Order', 'Lower_Left_X', 'Lower_Left_Y', 'Lower_Left_Z', 'Longitude', 'Latitude', 'Box_Width', 'Box_Length', 'Box_Height'])
     for vehicle_id, vehicle in enumerate(vehicles):
         ws.append([vehicle_id, 1, 'Depot'])
-        box_index = 0
+        box_index = vehicle.loaded_box_num-1
         route_order = 2
-        for route_index in vehicle.route[1:-1][::-1]:
+        for route_index in vehicle.route:
             destination_id = index_to_name[route_index]
             destination = destinations[destination_id]
-            for order in orders[route_index][::-1]:
+            for order in orders[route_index]:
                 box_position, box_size = vehicle.loaded_box_position_size[box_index]
                 x, y, z = box_position
                 size_x, size_y, size_z = box_size
                 ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index+1, x*10, 280-(y+size_y)*10, z*10, destination.longitude, destination.latitude, size_x*10, size_y*10, size_z*10])
-                box_index += 1
+                box_index -= 1
                 route_order += 1
         ws.append([vehicle_id, route_order, 'Depot'])
     wb.save("Result.xlsx")
