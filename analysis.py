@@ -41,14 +41,14 @@ for i in range(n):
         if i == j: continue
         a = all_pos[i]
         b = all_pos[j]
-        d = OD_matrix[i][j]
-        if d < 1000:
-            count += 1
-        data.append(d)
+        d1 = OD_matrix[i][j]
+        d2 = OD_matrix[j][i]
+        if d1 < 3000:
+            data.append(abs(d2-d1)/max(d1, d2))
 print(count)
 print(len(data))
 print(data[0])
-visualize.histogram(data, 0, 60000)
+visualize.histogram(data, 0, 1)
 
 # 들로네 삼각분할
 import numpy as np
@@ -82,12 +82,12 @@ plt.gca().set_aspect('equal')
 plt.show()
 
 # 박스 비율
-count = [0, 0, 0]
-for destination_order in orders.values():
-    for order in destination_order:
-        count[order.info] += 1
+# count = [0, 0, 0]
+# for destination_order in orders.values():
+#     for order in destination_order:
+#         count[order.info] += 1
 
-print(count)
+# print(count)
 # [151, 161, 125]
 
 # 총 부피

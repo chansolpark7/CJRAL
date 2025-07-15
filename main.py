@@ -618,7 +618,9 @@ def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[O
             destination = destinations[destination_id]
             for order in orders[route_index][::-1]:
                 box_position, box_size = vehicle.loaded_box_position_size[box_index]
-                ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index+1, *map(lambda x: x*10, box_position), destination.longitude, destination.latitude, *map(lambda x: x*10, box_size)])
+                x, y, z = box_position
+                size_x, size_y, size_z = box_size
+                ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index+1, x*10, 280-(y+size_y)*10, z*10, destination.longitude, destination.latitude, size_x*10, size_y*10, size_z*10])
                 box_index += 1
                 route_order += 1
         ws.append([vehicle_id, route_order, 'Depot'])
