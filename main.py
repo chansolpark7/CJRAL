@@ -575,8 +575,8 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
             demands[i] += box_volume[order.info]
     total_demand = sum(demands)
 
-    min_load_ratio = 0.9
-    max_load_ratio = 0.9
+    min_load_ratio = 0.80
+    max_load_ratio = 0.85
     print(total_demand / Vehicle.total_volume)
     print(total_demand / (Vehicle.total_volume * min_load_ratio))
     min_vehicle_num = math.ceil(total_demand / Vehicle.total_volume)
@@ -595,8 +595,9 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
     vehicles = []
     for i, route in enumerate(routes):
         if len(route) != 2:
-            vehicle = Vehicle(route, OD_matrix, orders)
+            vehicle = Vehicle(route[::-1], OD_matrix, orders)
             vehicle.load_box_bnb()
+            # vehicle.load_box_greedy()
             vehicles.append(vehicle)
             total_cost += int(vehicle.dist*0.5) + 150000
 
@@ -610,16 +611,16 @@ def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[O
     ws.append(['Vehicle_ID', 'Route_Order', 'Destination', 'Order_Number', 'Box_ID', 'Stacking_Order', 'Lower_Left_X', 'Lower_Left_Y', 'Lower_Left_Z', 'Longitude', 'Latitude', 'Box_Width', 'Box_Length', 'Box_Height'])
     for vehicle_id, vehicle in enumerate(vehicles):
         ws.append([vehicle_id, 1, 'Depot'])
+        box_index = 0
         route_order = 2
-        box_index = vehicle.loaded_box_num-1
-        for route_index in vehicle.route[1:-1]:
+        for route_index in vehicle.route[1:-1][::-1]:
             destination_id = index_to_name[route_index]
             destination = destinations[destination_id]
-            for order in orders[route_index]:
+            for order in orders[route_index][::-1]:
                 box_position, box_size = vehicle.loaded_box_position_size[box_index]
                 ws.append([vehicle_id, route_order, destination_id, order.order_num, order.box_id, box_index+1, *map(lambda x: x*10, box_position), destination.longitude, destination.latitude, *map(lambda x: x*10, box_size)])
+                box_index += 1
                 route_order += 1
-                box_index -= 1
         ws.append([vehicle_id, route_order, 'Depot'])
     wb.save("Result.xlsx")
 

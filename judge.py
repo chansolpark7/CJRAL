@@ -35,7 +35,8 @@ Box = namedtuple(
         'Lower_Left_Z',
         'Box_Width',
         'Box_Length',
-        'Box_Height'
+        'Box_Height',
+        'Destination'
     ]
 )
 
@@ -65,12 +66,12 @@ class Vehicle:
             if box_id != None:
                 position = (data.Lower_Left_X//10, data.Lower_Left_Y//10, data.Lower_Left_Z//10)
                 size = (data.Box_Width//10, data.Box_Length//10, data.Box_Height//10)
-                box = Box(*position, *size)
+                box = Box(*position, *size, data.Destination)
                 self.box_info[box_id] = box
                 self.load_box(box_id)
                 self.loaded_box_position_size.append((position, size))
 
-        print(self.used)
+        # print(self.used)
         self.deliver()
         self.total_cost = self.car_cost + self.travel_cost + self.shuffling_cost
 
@@ -87,34 +88,41 @@ class Vehicle:
     def unload_box(self, box_id):
         moved = {box_id}
 
-        def move_box(box_id):
+        def move_box(box_id, exclude):
             nonlocal moved
             box = self.box_info[box_id]
             x, y, z = box.Lower_Left_X, box.Lower_Left_Y, box.Lower_Left_Z
             size_x, size_y, size_z = box.Box_Width, box.Box_Length, box.Box_Height
-            print(x, y, z, size_x, size_y, size_z)
             for target_z in range(z+size_z, self.Z):
                 for dx in range(size_x):
                     for dy in range(size_y):
-                        other_box = self.used[x+dx][y+dy][target_z]
-                        if other_box != None and other_box not in moved:
+                        other_box_id = self.used[x+dx][y+dy][target_z]
+                        if other_box_id == None: continue
+
+                        other_box = self.box_info[other_box_id]
+                        if other_box_id not in moved:
+                            if other_box.Destination == exclude: continue
                             self.shuffling_cost += 500
-                            moved.add(other_box)
-                            move_box(other_box)
+                            moved.add(other_box_id)
+                            # move_box(other_box_id, exclude)
             for target_y in range(y+size_y, self.Y):
                 for dx in range(size_x):
                     for dz in range(size_z):
-                        other_box = self.used[x+dx][target_y][z+dz]
-                        if other_box != None and other_box not in moved:
-                            self.shuffling_cost += 500
-                            moved.add(other_box)
-                            move_box(other_box)
+                        other_box_id = self.used[x+dx][target_y][z+dz]
+                        if other_box_id == None: continue
 
-        move_box(box_id)
-        self.shuffling_cost += 500
+                        other_box = self.box_info[other_box_id]
+                        if other_box_id not in moved:
+                            if other_box.Destination == exclude: continue
+                            self.shuffling_cost += 500
+                            moved.add(other_box_id)
+                            # move_box(other_box_id, exclude)
+
+        # self.shuffling_cost += 500
         box = self.box_info[box_id]
         x, y, z = box.Lower_Left_X, box.Lower_Left_Y, box.Lower_Left_Z
         size_x, size_y, size_z = box.Box_Width, box.Box_Length, box.Box_Height
+        move_box(box_id, box.Destination)
         for dx in range(size_x):
             for dy in range(size_y):
                 for dz in range(size_z):
@@ -123,13 +131,19 @@ class Vehicle:
     def deliver(self):
         length = len(self.route)
         self.dist = 0
-        for i in range(length-1):
+        # for i in range(length-1):
+        #     start = self.name_to_index[self.route[i]]
+        #     end = self.name_to_index[self.route[i+1]]
+        #     self.dist += self.OD_matrix[start][end]
+        #     box_id = self.box_ids[i]
+        #     if box_id != None: self.unload_box(box_id)
+
+        for i in range(length-2, -1, -1):
             start = self.name_to_index[self.route[i]]
             end = self.name_to_index[self.route[i+1]]
             self.dist += self.OD_matrix[start][end]
             box_id = self.box_ids[i]
             if box_id != None: self.unload_box(box_id)
-            # print(self.used)
         self.travel_cost = self.dist * 0.5
 
 def judge(data_file_name, distance_file_name):
@@ -138,9 +152,11 @@ def judge(data_file_name, distance_file_name):
     OD_matrix = main.read_OD_matrix(n, name_to_index, distance_file_name)
     orders = main.read_orders(n, name_to_index, data_file_name)
 
+    # result_file_name = 'assignment1/sample Result.xlsx'
     result_file_name = 'Result.xlsx'
     wb = openpyxl.load_workbook(result_file_name)
-    ws = wb['Sheet']
+    wb.sheetnames
+    ws = wb[wb.sheetnames[0]]
 
     datas = []
     for index, row in enumerate(ws.rows):
@@ -167,7 +183,7 @@ def judge(data_file_name, distance_file_name):
         print(vehicle.total_cost)
         print(vehicle.car_cost, vehicle.travel_cost, vehicle.shuffling_cost)
         print()
-        viwer = visualize.box_viewer_3d(vehicle.loaded_box_position_size[::-1])
+        viwer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
         viwer.show()
 
     print(f'total cost : {total_cost}')
@@ -180,7 +196,7 @@ if __name__ == "__main__":
     distance_file_name = 'distance-data.txt'
     # data_file_name = 'additional_data.json'
     # distance_file_name = 'additional_distance_data.txt'
-    assert basename(os.getcwd()) == 'routing'
+    # assert basename(os.getcwd()) == 'routing'
 
     start_t = time.time()
     # os.system(f'python311 main.py {data_file_name} {distance_file_name}')
