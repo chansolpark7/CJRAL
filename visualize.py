@@ -19,7 +19,7 @@ class box_viewer_3d:
         self.fig.canvas.mpl_connect('key_press_event', self.key_callback)
         self.ax = self.fig.add_subplot(111, projection='3d')
         self.ax.set_xlim([0, 16])
-        self.ax.set_ylim([-28, 0])
+        self.ax.set_ylim([0, 28])
         self.ax.set_zlim([0, 18])
         self.ax.set_box_aspect([16, 28, 18])
 
@@ -57,7 +57,7 @@ class box_viewer_3d:
             for position, size in self.box_list[:value]:
                 x, y, z = position
                 dx, dy, dz = size
-                y, dy = -y, -dy
+                # y, dy = -y, -dy
                 # Draw a 3D box as a rectangular prism
                 xx = [x, x+dx, x+dx, x, x]
                 yy = [y, y, y+dy, y+dy, y]
@@ -77,7 +77,7 @@ class box_viewer_3d:
             for index, (position, size) in enumerate(self.box_list[:value]):
                 x, y, z = position
                 dx, dy, dz = size
-                y, dy = -y, -dy  # y축 반전
+                # y, dy = -y, -dy  # y축 반전
 
                 # 8개 꼭짓점
                 corners = [

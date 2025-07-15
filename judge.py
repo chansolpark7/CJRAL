@@ -104,8 +104,8 @@ class Vehicle:
                             if other_box.Destination == exclude: continue
                             self.shuffling_cost += 500
                             moved.add(other_box_id)
-                            # move_box(other_box_id, exclude)
-            for target_y in range(y+size_y, self.Y):
+                            move_box(other_box_id, exclude)
+            for target_y in range(y-1, -1, -1): # range(y+size_y, self.Y):
                 for dx in range(size_x):
                     for dz in range(size_z):
                         other_box_id = self.used[x+dx][target_y][z+dz]
@@ -116,7 +116,7 @@ class Vehicle:
                             if other_box.Destination == exclude: continue
                             self.shuffling_cost += 500
                             moved.add(other_box_id)
-                            # move_box(other_box_id, exclude)
+                            move_box(other_box_id, exclude)
 
         # self.shuffling_cost += 500
         box = self.box_info[box_id]
