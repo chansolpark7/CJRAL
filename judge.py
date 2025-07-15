@@ -106,11 +106,7 @@ class Vehicle: # 다른 좌표계 사용
                             self.shuffling_cost += 500
                             moved.add(other_box_id)
                             move_box(other_box_id, exclude)
-<<<<<<< HEAD
-            for target_y in range(y-1, -1, -1): # range(y+size_y, self.Y):
-=======
             for target_y in range(y-1, -1, -1):
->>>>>>> 좌표계-테스트
                 for dx in range(size_x):
                     for dz in range(size_z):
                         other_box_id = self.used[x+dx][target_y][z+dz]
