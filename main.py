@@ -160,90 +160,38 @@ class Vehicle2D:
         else:
             return (3, 4), (4, 3)
 
-    def load_box_bnb(self, box_information_3d):
-        # b1 b2 전처리
-        b1b2_boxes = [3 if i == 0 else 5 for i in box_information_3d if i != 2]
-        def solution(boxes):
-            n = len(boxes)
-            INF = 300
+    def load_box_greedy(self, box_informations):
+        # 30x40x30, 30x50x40, 50x60x50cm
+        # 160*280*180 x y z
 
-            dp = [[[INF]*19 for _ in range(19)] for _ in range(n + 1)]
-            prev = [[[None]*19 for _ in range(19)] for _ in range(n + 1)]
-            dp[0][0][0] = 0
-
-            for index in range(n):
-                size = boxes[index]
-                for i in range(19):
-                    for j in range(19):
-                        if dp[index][i][j] == INF: continue
-                        if i + size > 18:
-                            if dp[index + 1][j][size] > dp[index][i][j] + 1:
-                                dp[index + 1][j][size] = dp[index][i][j] + 1
-                                prev[index + 1][j][size] = (i, j)
-                        else:
-                            if dp[index + 1][i + size][j] > dp[index][i][j] + (i == 0):
-                                dp[index + 1][i + size][j] = dp[index][i][j] + (i == 0)
-                                prev[index + 1][i + size][j] = (i, j)
-                        if j + size > 18:
-                            pass
-                        else:
-                            if dp[index + 1][i][j + size] > dp[index][i][j] + (j == 0):
-                                dp[index + 1][i][j + size] = dp[index][i][j] + (j == 0)
-                                prev[index + 1][i][j + size] = (i, j)
-
-            answer = min(min(arr) for arr in dp[n])
-
-            best_i, best_j = None, None
-            best_score = -1
-            for i in range(19):
-                for j in range(19):
-                    if dp[n][i][j] == answer:
-                        score = (18 - i if i <= 15 else 0) + (18 - j if j <= 15 else 0)
-                        if score > best_score:
-                            best_i, best_j = i, j
-                            best_score = score
-
-            path = []
-            box_index = answer-1
-            i, j = best_i, best_j
-            for index in range(n, 0, -1):
-                size = boxes[index-1]
-                prev_i, prev_j = prev[index][i][j]
-                if prev_i == i and prev_j + size == j:
-                    path.append(box_index)
-                else:
-                    if prev_i + size > 18:
-                        path.append(box_index)
-                        box_index -= 1
-                    else:
-                        path.append(box_index-1)
-                i, j = prev_i, prev_j
-            path.reverse()
-            return path
-        b1b2_placement_index = solution(b1b2_boxes)
-        b3_placement_index = [i//3 for i in range(len(box_information_3d) - len(b1b2_boxes))]
-
-        self.box_informations = []
-        self.placement_index = []
-        b1b2_index = 0
-        b3_index = 0
-        counter = dict()
-        for index, info_3d in enumerate(box_information_3d):
-            info_2d = 0 if info_3d == 2 else 1
-            if info_2d == 0:
-                p = b3_placement_index[b3_index]
-                b3_index += 1
-            else:
-                p = b1b2_placement_index[b1b2_index]
-                b1b2_index += 1
-
-            if (info_2d, p) not in counter:
-                counter[(info_2d, p)] = len(counter)
-                self.box_informations.append(info_2d)
-            self.placement_index.append(counter[(info_2d, p)])
+        self.box_informations = box_informations
         self.box_num = len(self.box_informations)
+        self.b1b2_box_num = 0
+        self.b3_box_num = 0
+        for info in self.box_informations:
+            best_fit_position = None
+            best_fit_size = None
+            best_fit_possible_volume = -1
+            for size in self.get_possible_orientations(info):
+                positions = self.get_possible_positions(size)
+                if len(positions) == 0: continue
+                for position in positions:
+                    self.load_box_at(position, size)
+                    possible_volume = self.calc_possible_volume()
+                    self.unload_box_at(position, size)
+                    if possible_volume > best_fit_possible_volume:
+                        best_fit_size = size
+                        best_fit_position = position
+                        best_fit_possible_volume = possible_volume
+            if best_fit_position != None:
+                self.load_box_at(best_fit_position, best_fit_size)
+                self.loaded_box_position_size.append((best_fit_position, best_fit_size))
+                self.box_num += 1
+            else: break
 
-        # main
+    def load_box_bnb(self, box_informations):
+        self.box_informations = box_informations
+        self.box_num = len(self.box_informations)
         answer_volume = 0
         answer_loaded_box_position_size = None
         self.b1b2_box_num = 0
@@ -511,11 +459,94 @@ class Vehicle:
         if box_informations != None:
             self.box_informations = box_informations
             self.box_num = len(self.box_informations)
+
+        # b1 b2 전처리
+        b1b2_boxes = [3 if i == 0 else 5 for i in self.box_informations if i != 2]
+        def solution(boxes):
+            n = len(boxes)
+            INF = 300
+
+            dp = [[[INF]*19 for _ in range(19)] for _ in range(n + 1)]
+            prev = [[[None]*19 for _ in range(19)] for _ in range(n + 1)]
+            dp[0][0][0] = 0
+
+            for index in range(n):
+                size = boxes[index]
+                for i in range(19):
+                    for j in range(19):
+                        if dp[index][i][j] == INF: continue
+                        if i + size > 18:
+                            if dp[index + 1][j][size] > dp[index][i][j] + 1:
+                                dp[index + 1][j][size] = dp[index][i][j] + 1
+                                prev[index + 1][j][size] = (i, j)
+                        else:
+                            if dp[index + 1][i + size][j] > dp[index][i][j] + (i == 0):
+                                dp[index + 1][i + size][j] = dp[index][i][j] + (i == 0)
+                                prev[index + 1][i + size][j] = (i, j)
+                        if j + size > 18:
+                            pass
+                        else:
+                            if dp[index + 1][i][j + size] > dp[index][i][j] + (j == 0):
+                                dp[index + 1][i][j + size] = dp[index][i][j] + (j == 0)
+                                prev[index + 1][i][j + size] = (i, j)
+
+            answer = min(min(arr) for arr in dp[n])
+
+            best_i, best_j = None, None
+            best_score = -1
+            for i in range(19):
+                for j in range(19):
+                    if dp[n][i][j] == answer:
+                        score = (18 - i if i <= 15 else 0) + (18 - j if j <= 15 else 0)
+                        if score > best_score:
+                            best_i, best_j = i, j
+                            best_score = score
+
+            path = []
+            box_index = answer-1
+            i, j = best_i, best_j
+            for index in range(n, 0, -1):
+                size = boxes[index-1]
+                prev_i, prev_j = prev[index][i][j]
+                if prev_i == i and prev_j + size == j:
+                    path.append(box_index)
+                else:
+                    if prev_i + size > 18:
+                        path.append(box_index)
+                        box_index -= 1
+                    else:
+                        path.append(box_index-1)
+                i, j = prev_i, prev_j
+            path.reverse()
+            return path
+        b1b2_placement_index = solution(b1b2_boxes)
+        b3_placement_index = [i//3 for i in range(len(self.box_informations) - len(b1b2_boxes))]
+
+        box_informations_2d = []
+        placement_index = []
+        b1b2_index = 0
+        b3_index = 0
+        counter = dict()
+        for index, info_3d in enumerate(self.box_informations):
+            info_2d = 0 if info_3d == 2 else 1
+            if info_2d == 0:
+                p = b3_placement_index[b3_index]
+                b3_index += 1
+            else:
+                p = b1b2_placement_index[b1b2_index]
+                b1b2_index += 1
+
+            if (info_2d, p) not in counter:
+                counter[(info_2d, p)] = len(counter)
+                box_informations_2d.append(info_2d)
+            placement_index.append(counter[(info_2d, p)])
+
+        # main
         vehicle_2d = Vehicle2D()
-        vehicle_2d.load_box_bnb(self.box_informations)
+        vehicle_2d.load_box_bnb(box_informations_2d)
         height = [0] * vehicle_2d.loaded_box_num
         for index, info_3d in enumerate(self.box_informations):
-            p = vehicle_2d.placement_index[index]
+            p = placement_index[index]
             if p >= vehicle_2d.loaded_box_num: continue
             position_2d, size_2d = vehicle_2d.loaded_box_position_size[p]
             position_3d = (*position_2d, height[p])

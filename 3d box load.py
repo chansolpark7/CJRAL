@@ -102,6 +102,7 @@ class Vehicle2D:
         # 160*280*180 x y z
 
         self.box_informations = box_informations
+        self.box_num = len(self.box_informations)
         self.b1b2_box_num = 0
         self.b3_box_num = 0
         for info in self.box_informations:
@@ -127,6 +128,7 @@ class Vehicle2D:
 
     def load_box_bnb(self, box_informations):
         self.box_informations = box_informations
+        self.box_num = len(self.box_informations)
         answer_volume = 0
         answer_loaded_box_position_size = None
         self.b1b2_box_num = 0
