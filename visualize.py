@@ -117,7 +117,8 @@ class box_viewer_2d:
         self.fig.canvas.mpl_connect('key_press_event', self.key_callback)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_xlim([0, 16])
-        self.ax.set_ylim([-28, 0])
+        self.ax.set_ylim([0, 28])
+        self.ax.invert_yaxis()
         plt.gca().set_aspect('equal', adjustable='box')
 
         self.ax.set_xlabel('X')
@@ -150,7 +151,6 @@ class box_viewer_2d:
         for position, size in self.box_list[:val]:
             x, y = position
             dx, dy = size
-            y, dy = -y, -dy
             xx = [x, x+dx, x+dx, x, x]
             yy = [y, y, y+dy, y+dy, y]
             kwargs = {'alpha': 0.5}

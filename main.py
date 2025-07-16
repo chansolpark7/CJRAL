@@ -349,6 +349,7 @@ class Vehicle:
     def __init__(self, route, OD_matrix, orders):
         self.route = route
         self.cost = 0
+        self.dist = 0
         self.used = [[[False]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
         self.depth = [[0] * self.Z for _ in range(self.X)]
         self.box_informations = []
