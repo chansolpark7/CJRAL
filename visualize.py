@@ -1,11 +1,12 @@
 import main
-import matplotlib.pyplot as plt
 import random
 import sys
 import numpy as np
-# from mpl_toolkits.mplot3d import Axes3D
+
+import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.widgets import Slider
+import matplotlib.ticker as ticker
 
 # main의 어떤 함수를 이용해서 depo, destinations 정보 불러오는 구조
 # main.read_map() -> [depo, destinations]
@@ -178,6 +179,60 @@ def graph(**datas):
     plt.grid(True)
     plt.show()
 
+def benchmark(result):
+    def int_with_commas(x, pos):
+        return f'{int(x):,}'
+
+    n = len(result[0])
+    data = []
+    for i in range(n):
+        time = []
+        cost = []
+        for d in result:
+            time.append(d[i][1])
+            cost.append(d[i][2])
+        data.append((time, cost))
+
+    x = list(range(1, len(result) + 1))
+
+    # 한 화면에 두 그래프 (Running Time & Total Cost)
+    plt.figure(figsize=(12, 5))
+
+    # 1. Running Time
+    plt.subplot(1, 2, 1)  # (행, 열, 위치)
+    for i in range(n):
+        name = f'Algorithm {i+1}'
+        plt.plot(x, data[i][0], marker='o', label=name)
+    plt.title('Running Time Comparison')
+    plt.xlabel('Experiment')
+    plt.ylabel('Time')
+    plt.legend()
+    plt.grid(True)
+    plt.ylim(bottom=0)
+    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    ax = plt.gca()
+    formatter = ticker.ScalarFormatter(useOffset=False)
+    formatter.set_scientific(False)
+    ax.yaxis.set_major_formatter(formatter)
+
+    # 2. Total Cost
+    plt.subplot(1, 2, 2)
+    for i in range(n):
+        name = f'Algorithm {i+1}'
+        plt.plot(x, data[i][1], marker='o', label=name)
+    plt.title('Total Cost Comparison')
+    plt.xlabel('Experiment')
+    plt.ylabel('Cost')
+    plt.legend()
+    plt.grid(True)
+    plt.ylim(bottom=0)
+    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    ax = plt.gca()
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(int_with_commas))
+
+    plt.tight_layout()
+    plt.show()
+
 def plot_vrp():
     data_file_name = 'Data_Set.json'
     distance_file_name = 'distance-data.txt'
@@ -227,4 +282,5 @@ def plot_vrp():
     plt.show()
     
 if __name__ == "__main__":
-    plot_vrp()
+    # plot_vrp()
+    benchmark([((0, 17.863848447799683, 1992247), (0, 13.12440800666809, 2133084)), ((0, 12.218220710754395, 1098969), (0, 12.001279830932617, 1249722)), ((0, 67.00232529640198, 0), (0, 13.502542495727539, 2942740)), ((0, 155.60183548927307, 2528759), (0, 13.454965353012085, 2801769)), ((0, 29.114457607269287, 2501728), (0, 13.28079080581665, 2625760))])

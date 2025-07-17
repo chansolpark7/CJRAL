@@ -254,7 +254,10 @@ if __name__ == "__main__":
             start_t = time.time()
             ret = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
             running_time = time.time() - start_t
-            total_cost = judge(data_file_name, distance_file_name)
+            try:
+                total_cost = judge(data_file_name, distance_file_name)
+            except:
+                total_cost = 0
 
             print(ret)
             print(f'{running_time=}')
@@ -273,19 +276,27 @@ if __name__ == "__main__":
             ret1 = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
             running_time1 = time.time() - start_t
 
-            try:
-                total_cost1 = judge(data_file_name, distance_file_name)
-            except:
-                total_cost1 = 0
+            if ret1 == 0:
+                try:
+                    total_cost1 = judge(data_file_name, distance_file_name)
+                except Exception as reason:
+                    total_cost1 = 0
+                    print(reason)
+            else: total_cost1 = 0
 
             start_t = time.time()
             ret2 = os.system(f'python311 prev_main.py {data_file_name} {distance_file_name}')
             running_time2 = time.time() - start_t
-            try:
-                total_cost2 = judge(data_file_name, distance_file_name)
-            except:
-                total_cost2 = 0
+
+            if ret2 == 0:
+                try:
+                    total_cost2 = judge(data_file_name, distance_file_name)
+                except Exception as reason:
+                    total_cost2 = 0
+                    print(reason)
+            else: total_cost2 = 0
 
             result.append(((ret1, running_time1, total_cost1), (ret2, running_time2, total_cost2)))
-    
+
     print(result)
+    visualize.benchmark(result)

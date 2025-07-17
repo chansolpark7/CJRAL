@@ -728,7 +728,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
 
     return solution, routes
 
-def VRP(n, OD_matrix, orders, min_load_ratio=0.9, max_load_ratio=0.95) -> list[Vehicle]:
+def VRP(n, OD_matrix, orders, min_load_ratio=0.8, max_load_ratio=0.85) -> list[Vehicle]:
     demands = [0] * n
     for i in range(1, n):
         for order in orders[i]:
@@ -745,9 +745,7 @@ def VRP(n, OD_matrix, orders, min_load_ratio=0.9, max_load_ratio=0.95) -> list[V
 
     solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, depot=0)
 
-    if not routes:
-        print("route not found")
-        return
+    assert routes
 
     vehicles = []
     for route in routes:
@@ -755,7 +753,6 @@ def VRP(n, OD_matrix, orders, min_load_ratio=0.9, max_load_ratio=0.95) -> list[V
             vehicle = Vehicle(route, orders)
             vehicles.append(vehicle)
 
-    # if DEBUG: print(f'total cost : {total_cost:,}')
     return vehicles
 
 def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[Order], index_to_name):
@@ -806,31 +803,10 @@ def main(data_filename, distance_filename):
     for vehicle in vehicles: vehicle.load_box_bnb()
     if DEBUG: print(f'loaded box : {time.time() - start_t}\n')
 
-    # if DEBUG:
-    #     for index, vehicle in enumerate(vehicles):
-    #         print(f'Vehicle {index}')
-    #         print(f'route : {vehicle.route}')
-    #     print()
-    
     if DEBUG:
         vehicle_status(vehicles)
-        # for vehicle in vehicles:
-        #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
-        #     viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
-        #     viewer.show()
 
-    # if DEBUG: print('start local search')
-    # success, vehicles = feasible_solution_local_search(vehicles, OD_matrix, orders)
-    # print(f'{success = }')
-    # if DEBUG: print(f'local search time : {time.time() - start_t}\n')
-
-    if DEBUG:
-        vehicle_status(vehicles)
-        # for vehicle in vehicles:
-        #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
-        #     viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
-        #     viewer.show()
-
+    if vehicle.unloaded_route: exit(1)
     save(vehicles, destinations, orders, index_to_name)
 
 # python311 prev_main.py Data_Set.json distance-data.txt
