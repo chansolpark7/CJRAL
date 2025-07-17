@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -85,29 +86,7 @@ def generate_city_network(total_points=500, seed=None):
     return delivery_points, main_city_coords, road_lines
 
 
-def plot_city_network(delivery_points, road_lines):
-    xs = [p[1] for p in delivery_points]
-    ys = [p[2] for p in delivery_points]
-
-    plt.figure(figsize=(12, 10))
-    plt.scatter(xs, ys, s=40, c='skyblue', edgecolors='k', label="Delivery Point")
-
-    depot_x, depot_y = 500, 500
-    plt.scatter(depot_x, depot_y, s=250, c='red', marker='*', label='Depot')
-
-    for (start, end) in road_lines:
-        plt.plot([start[0], end[0]], [start[1], end[1]], 'k--', linewidth=1)
-
-    plt.title("Simulated City Delivery Network")
-    plt.xlabel("X Coordinate")
-    plt.ylabel("Y Coordinate")
-    plt.axis("equal")
-    plt.grid(True)
-    plt.legend(loc='upper right')
-    plt.show()
-
-
-def convert_to_json(delivery_points, filename='additional_data.json'):
+def convert_to_json(delivery_points, filename):
     base_x, base_y = 500, 500
     base_lon, base_lat = 129.0750875, 35.17982005
     scale = 0.0002
@@ -134,7 +113,7 @@ def convert_to_json(delivery_points, filename='additional_data.json'):
     order_number = 1
     box_number = 1
     for dest in destinations:
-        num_boxes = random.randint(1, 2)
+        num_boxes = random.randint(1, 5)
         for _ in range(num_boxes):
             size = random.choice(box_sizes)
             orders.append({
@@ -165,7 +144,6 @@ def convert_to_json(delivery_points, filename='additional_data.json'):
 
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"[✅] JSON saved to '{filename}'")
 
 
 def haversine(lon1, lat1, lon2, lat2):
@@ -180,7 +158,7 @@ def haversine(lon1, lat1, lon2, lat2):
     return distance_km * 1000
 
 
-def export_distance_table(delivery_points, filename='additional_distance_data.txt'):
+def export_distance_table(delivery_points, filename):
     base_x, base_y = 500, 500
     base_lon, base_lat = 129.0750875, 35.17982005
     scale = 0.0002
@@ -215,11 +193,21 @@ def export_distance_table(delivery_points, filename='additional_distance_data.tx
 
     with open(filename, "w", encoding="utf-8") as f:
         f.writelines(lines)
-    print(f"[✅] Distance table saved to '{filename}'")
 
 if __name__ == "__main__":
-    total_delivery_points = int(input("Enter total number of delivery points: "))
-    points, mains, roads = generate_city_network(total_delivery_points, seed=None)
-    plot_city_network(points, roads)
-    convert_to_json(points)
-    export_distance_table(points)
+    os.makedirs("data", exist_ok=True)
+
+    place_list = [random.randint(200, 500) for _ in range(5)]  # 5개 데이터 생성
+    print(f"장소 수 리스트: {place_list}")
+
+    for idx, total_delivery_points in enumerate(place_list):
+        points, mains, roads = generate_city_network(total_delivery_points, seed=None)
+
+        json_filename = f"data/additional_data_{idx+1:02d}.json"
+        txt_filename = f"data/additional_distance_data_{idx+1:02d}.txt"
+
+        convert_to_json(points, filename=json_filename)
+        export_distance_table(points, filename=txt_filename)
+
+        print(f"[✅] Saved: {json_filename}")
+        print(f"[✅] Saved: {txt_filename}")
