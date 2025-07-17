@@ -72,7 +72,7 @@ def read_OD_matrix(n, name_to_index, filename='distance-data.txt'):
 
     return OD_matrix
 
-def read_orders(n, name_to_index, filename='Data_Set.json'):
+def read_orders(n, name_to_index, filename='Data_Set.json') -> list[list[Order]]:
     with open(filename, 'rt', encoding='utf-8') as file:
         raw_data = json.load(file)
 
@@ -648,7 +648,8 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
             if len(vehicle.unloaded_route) != 0:
                 queue.append((0, 1, index)) ##### 가중치 결정?
 
-        queue.sort(key=lambda x: x[:2], reverse=True)
+        # queue.sort(key=lambda x: x[:2], reverse=True)
+        random.shuffle(queue)
         print(f'depth : {depth}')
         vehicle_status(vehicles)
         for index, (_, ls_type, vehicle_index) in enumerate(queue):
@@ -797,7 +798,7 @@ def main(data_filename, distance_filename):
     if DEBUG: print(f'read file time : {time.time() - start_t}\n')
 
     if DEBUG: print('start VRP')
-    vehicles = VRP(n, OD_matrix, orders, 0.90, 0.95)
+    vehicles = VRP(n, OD_matrix, orders, 0.90, 0.90)
     if DEBUG: print(f'VRP time : {time.time() - start_t}\n')
 
     if DEBUG: print('start load box')

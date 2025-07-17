@@ -1,5 +1,5 @@
 import openpyxl
-from os.path import basename, dirname
+from os.path import basename, dirname, join
 import os
 import time
 from collections import namedtuple
@@ -140,11 +140,40 @@ class Vehicle: # 다른 좌표계 사용
             if box_id != None: self.unload_box(box_id)
         self.travel_cost = self.dist * 0.5
 
+
 def judge(data_file_name, distance_file_name):
     destinations, name_to_index, index_to_name = main.read_map(data_file_name)
     n = len(destinations)
     OD_matrix = main.read_OD_matrix(n, name_to_index, distance_file_name)
     orders = main.read_orders(n, name_to_index, data_file_name)
+
+    def check_excel_error(datas: list[list[Data]]):
+        # 행 검사
+        order_num_data: dict[int, main.Order] = dict()
+        for i in range(n):
+            for order in orders[i]:
+                order_num_data[order.order_num] = order
+
+        for index, data in enumerate(datas):
+            assert data[0].Destination == 'Depot', f'Vehicle {index}, route order 1 must be depot'
+            assert data[-1].Destination == 'Depot', f'Vehicle {index}, last route order must be depot'
+            for route_order, d in enumerate(data[1:-1], 2):
+                assert d.Route_Order == route_order, f'Vehicle {index}, route order {route_order} : route order error'
+                assert d.Stacking_Order == len(data) - route_order, f'Vehicle {index}, route order {route_order} : stacking order error'
+                order_data = order_num_data[d.Order_Number]
+                assert all([
+                    order_data.destination == d.Destination,
+                    order_data.box_id == d.Box_ID,
+                    order_data.info == [100, 120, 160].index(d.Box_Width + d.Box_Length + d.Box_Height)
+                ]), f'Vehicle {index}, route order {route_order} : data error'
+
+        # 빠진 데이터 검사
+        visited = [len(orders[i]) for i in range(n)]
+        for index, data in enumerate(datas):
+            for d in data[1:-1]:
+                visited[name_to_index[d.Destination]] -= 1
+
+        assert all(destination == 0 for destination in visited), 'There are destinations that have not been visited'
 
     # result_file_name = 'assignment1/sample Result.xlsx'
     result_file_name = 'Result.xlsx'
@@ -159,6 +188,8 @@ def judge(data_file_name, distance_file_name):
         if len(datas) == data.Vehicle_ID:
             datas.append([])
         datas[data.Vehicle_ID].append(data)
+
+    check_excel_error(datas)
 
     vehicles: list[Vehicle] = []
     for data in datas:
@@ -183,8 +214,8 @@ def judge(data_file_name, distance_file_name):
             position = (x, 28-(y+size_y), z)
             size = (size_x, size_y, size_z)
             loaded_box_position_size.append((position, size))
-        viwer = visualize.box_viewer_3d(loaded_box_position_size)
-        viwer.show()
+        # viwer = visualize.box_viewer_3d(loaded_box_position_size)
+        # viwer.show()
 
     print(f'total cost : {total_cost}')
     print(f'car cost : {car_cost}')
@@ -192,15 +223,31 @@ def judge(data_file_name, distance_file_name):
     print(f'shuffling cost : {shuffling_cost}')
 
 if __name__ == "__main__":
-    # data_file_name = 'Data_Set.json'
-    # distance_file_name = 'distance-data.txt'
-    data_file_name = 'additional_data.json'
-    distance_file_name = 'additional_distance_data.txt'
-    # assert basename(os.getcwd()) == 'routing'
+    assert basename(os.getcwd()) == 'routing'
 
-    start_t = time.time()
-    os.system(f'python311 main.py {data_file_name} {distance_file_name}')
-    running_time = time.time() - start_t
+    mode = int(input('mode : '))
+    if mode == 1:
+        data_file_name = 'Data_Set.json'
+        distance_file_name = 'distance-data.txt'
 
-    print(f'{running_time=}')
-    judge(data_file_name, distance_file_name)
+        start_t = time.time()
+        result = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
+        running_time = time.time() - start_t
+
+        print(f'{running_time=}')
+        judge(data_file_name, distance_file_name)
+    elif mode == 2:
+        num = len(os.listdir('data')) // 2
+        for i in range(1, num + 1):
+            print(f'testing {i}')
+            data_file_name = f'data/additional_data_{i:02d}.json'
+            distance_file_name = f'data/additional_distance_data_{i:02d}.txt'
+            assert os.path.exists(data_file_name)
+            assert os.path.exists(distance_file_name)
+
+            start_t = time.time()
+            result = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
+            running_time = time.time() - start_t
+
+            print(f'{running_time=}')
+            judge(data_file_name, distance_file_name)

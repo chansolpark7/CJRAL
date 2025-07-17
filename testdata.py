@@ -1,4 +1,5 @@
 import os
+from os.path import basename
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -195,6 +196,7 @@ def export_distance_table(delivery_points, filename):
         f.writelines(lines)
 
 if __name__ == "__main__":
+    assert basename(os.getcwd()) == 'routing'
     os.makedirs("data", exist_ok=True)
 
     place_list = [random.randint(200, 500) for _ in range(5)]  # 5개 데이터 생성
