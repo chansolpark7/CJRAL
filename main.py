@@ -14,7 +14,7 @@ Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 # Distance = namedtuple('Distance', ['time', 'meter'])
 
-DEBUG = True
+DEBUG = False
 LOCAL_SEARCH_DEPTH_LIMIT = 6
 INTERNAL_OPTIMIZATION_THRESHOLD = 0.05
 
@@ -852,25 +852,25 @@ def main(data_filename, distance_filename):
     n = len(destinations)
     OD_matrix = read_OD_matrix(n, name_to_index, distance_filename)
     orders = read_orders(n, name_to_index, data_filename)
-    if DEBUG: print(f'read file time : {time.time() - start_t}\n')
+    print(f'read file time : {time.time() - start_t}\n')
 
-    if DEBUG: print('start VRP')
+    print('start VRP')
     vehicles = VRP(n, OD_matrix, orders, 0.90, 0.95)
-    if DEBUG: print(f'VRP time : {time.time() - start_t}\n')
+    print(f'VRP time : {time.time() - start_t}\n')
 
-    if DEBUG: print('start load box')
+    print('start load box')
     for vehicle in vehicles: vehicle.load_box_bnb()
-    if DEBUG: print(f'loaded box : {time.time() - start_t}\n')
+    print(f'loaded box : {time.time() - start_t}\n')
     
     if DEBUG:
         vehicle_status(vehicles)
         # for vehicle in vehicles:
         #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
 
-    if DEBUG: print('start local search')
+    print('start local search')
     success, vehicles = feasible_solution_local_search(vehicles, OD_matrix, orders, start_t + CVRP_TIME_LIMIT)
     print(f'{success = }')
-    if DEBUG: print(f'local search time : {time.time() - start_t}\n')
+    print(f'local search time : {time.time() - start_t}\n')
 
     if DEBUG:
         vehicle_status(vehicles)

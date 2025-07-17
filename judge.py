@@ -7,7 +7,7 @@ from collections import namedtuple
 import main
 import visualize
 
-DEBUG = False
+DEBUG = True
 VISUALIZE = False
 
 Data = namedtuple(
