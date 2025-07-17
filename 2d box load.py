@@ -13,7 +13,7 @@ box_sizes= [
 
 box_volumes = [i[0]*i[1] for i in box_sizes]
 
-class LOGER:
+class LOGGER:
     def __init__(self, interval=0.1, enable=True):
         self.interval = interval
         self.enable = enable
@@ -289,6 +289,6 @@ def run():
     visualize.graph(data=log.return_data())
 
 if __name__ == "__main__":
-    log = LOGER()
+    log = LOGGER()
     # for _ in range(10):
     run()

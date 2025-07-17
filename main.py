@@ -6,16 +6,28 @@ import math
 import numpy
 import json
 import sys
+import copy
+import random
 from collections import defaultdict, namedtuple, deque
-
-# import visualize
 
 Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 # Distance = namedtuple('Distance', ['time', 'meter'])
 
-CVRP_TIME_LIMIT = 10*60
-BOX_LOAD_TIME_LIMIT = 5
+DEBUG = True
+LOCAL_SEARCH_DEPTH_LIMIT = 10
+INTERNAL_OPTIMIZATION_THRESHOLD = 0.01
+
+if DEBUG:
+    import visualize
+
+    CVRP_TIME_LIMIT = 10
+    BOX_LOAD_TIME_LIMIT = 5
+    LOCAL_SEARCH_TIME_LIMIT = 30
+else:
+    CVRP_TIME_LIMIT = 10*60
+    BOX_LOAD_TIME_LIMIT = 5
+    LOCAL_SEARCH_TIME_LIMIT = 60 #
 
 box_size = [
     [30, 40, 30],
@@ -294,24 +306,28 @@ class Vehicle:
     Z = 18
     total_volume = X*Y*Z*1000
 
-    def __init__(self, route, OD_matrix, orders):
+    def __init__(self, route, orders):
         self.route = route
-        self.cost = 0
         self.dist = 0
         self.used = [[[False]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
         self.depth = [[0] * self.Z for _ in range(self.X)]
-        self.box_informations = []
-        self.box_num = 0
-        self.loaded_box_position_size = []
-        self.loaded_box_num = 0
 
-        for index in self.route[1:-1]:
-            for box in orders[index]:
+        self.data_empty_volume = []
+        self.data_possible_volume = []
+
+        self.box_informations = []
+        self.box_route_index = []
+        for index, node in enumerate(self.route):
+            for box in orders[node]:
                 self.box_informations.append(box.info)
+                self.box_route_index.append(index)
         self.box_num = len(self.box_informations)
         self.box_informations.reverse()
+        self.box_route_index.reverse()
 
-        self.calculate_dist(OD_matrix)
+        self.loaded_box_position_size = []
+        self.loaded_box_num = 0
+        self.unloaded_route = []
 
     def calculate_dist(self, OD_matrix):
         length = len(self.route)
@@ -320,6 +336,7 @@ class Vehicle:
             start = self.route[i]
             end = self.route[i+1]
             self.dist += OD_matrix[start][end]
+        return self.dist
 
     def load_box_at(self, position, size):
         x, y, z = position
@@ -391,6 +408,9 @@ class Vehicle:
 
         return volume
 
+    def calc_load_factor(self):
+        return self.calc_filled_volume() / self.total_volume
+
     def get_possible_positions(self, size):
         size_x, size_y, size_z = size
         positions = []
@@ -426,8 +446,8 @@ class Vehicle:
         if box_informations != None:
             self.box_informations = box_informations
             self.box_num = len(self.box_informations)
-        possible_volume_data = []
-        empty_volume_data = []
+        self.data_possible_volume = []
+        self.data_empty_volume = []
 
         self.loaded_box_num = 0
         for info in self.box_informations:
@@ -449,11 +469,9 @@ class Vehicle:
                 self.loaded_box_position_size.append((best_fit_position, best_fit_size))
                 self.loaded_box_num += 1
 
-                possible_volume_data.append(best_fit_possible_volume)
-                empty_volume_data.append(self.calc_empty_volume())
+                self.data_possible_volume.append(best_fit_possible_volume)
+                self.data_empty_volume.append(self.calc_empty_volume())
             else: break
-
-        return possible_volume_data, empty_volume_data
 
     def load_box_bnb(self, box_informations=None):
         if box_informations != None:
@@ -544,17 +562,120 @@ class Vehicle:
         # main
         vehicle_2d = Vehicle2D()
         vehicle_2d.load_box_bnb(box_informations_2d)
+
+        # unloaded_route_index 찾기
+        if vehicle_2d.loaded_box_num != vehicle_2d.box_num:
+            p = placement_index.index(vehicle_2d.loaded_box_num)
+            unloaded_route_index = self.box_route_index[p]
+        else:
+            unloaded_route_index = 0
+
         height = [0] * vehicle_2d.loaded_box_num
+        self.data_possible_volume = [self.total_volume]
+        self.data_empty_volume = [self.total_volume]
         for index, info_3d in enumerate(self.box_informations):
+            if self.box_route_index[index] <= unloaded_route_index: break
             p = placement_index[index]
-            if p >= vehicle_2d.loaded_box_num: continue
             position_2d, size_2d = vehicle_2d.loaded_box_position_size[p]
             position_3d = (*position_2d, height[p])
             size_3d = (*size_2d, [3, 5, 6][info_3d])
             height[p] += size_3d[2]
             self.load_box_at(position_3d, size_3d)
+            self.data_possible_volume.append(self.calc_possible_volume())
+            self.data_empty_volume.append(self.calc_empty_volume())
             self.loaded_box_position_size.append((position_3d, size_3d))
         self.loaded_box_num = len(self.loaded_box_position_size)
+
+        # 싣지 못한 목적지 unloaded_route에 저장, route, box_num 정리
+        if unloaded_route_index != 0:
+            self.unloaded_route = self.route[1:unloaded_route_index+1]
+            self.route = [self.route[0]] + self.route[unloaded_route_index+1:]
+            self.box_informations = self.box_informations[:self.loaded_box_num]
+            self.box_route_index = self.box_route_index[:self.loaded_box_num]
+            self.box_num = self.loaded_box_num
+
+def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, orders): # LS
+    start_t = time.time()
+
+    def internal_optimization(vehicle: Vehicle):
+        for box_index in range(vehicle.loaded_box_num-1, -1, -1):
+            if (vehicle.data_empty_volume[box_index+1] - vehicle.data_possible_volume[box_index+1]) / vehicle.total_volume < INTERNAL_OPTIMIZATION_THRESHOLD:
+                break
+        node = vehicle.box_route_index[box_index]
+        if node == len(vehicle.route)-2: node -= 1
+        new_route = vehicle.route[:]
+        new_route[node], new_route[node + 1] = new_route[node + 1], new_route[node]
+        
+        new_vehicle = Vehicle(new_route, orders)
+        return new_vehicle
+
+    def reassign_destination(vehicles: list[Vehicle], target_vehicle_index):
+        min_ratio_vehicle_index = None
+        min_ratio = 1
+        for index, vehicle in enumerate(vehicles):
+            if index == target_vehicle_index: continue
+            ratio = vehicle.calc_load_factor()
+            if ratio < min_ratio:
+                min_ratio_vehicle_index = index
+                min_ratio = ratio
+
+        if min_ratio_vehicle_index != None:
+            v1 = vehicles[target_vehicle_index]
+            v2 = vehicles[min_ratio_vehicle_index]
+            new_route = [0] + v1.unloaded_route + v2.route[1:]
+            v1.unloaded_route = []
+            new_vehicle = Vehicle(new_route, orders)
+            new_vehicle.load_box_bnb()
+            vehicles[min_ratio_vehicle_index] = new_vehicle
+
+    def dfs(depth):
+        nonlocal vehicles
+        if depth == LOCAL_SEARCH_DEPTH_LIMIT: return False
+        if time.time() - start_t > LOCAL_SEARCH_TIME_LIMIT: return False
+
+        if all(len(vehicle.unloaded_route) == 0 for vehicle in vehicles): return True
+
+        # 0 : 내부 적재 최적화
+        # 1 : 목적지 재할당
+        queue: list[tuple[float, int, Vehicle]] = []
+        for index, vehicle in enumerate(vehicles):
+            # 0
+            # r = (vehicle.data_empty_volume[-1] - vehicle.data_possible_volume[-1]) / vehicle.total_volume
+            # if r > INTERNAL_OPTIMIZATION_THRESHOLD and len(vehicle.route) > 3:
+            #     queue.append((r, 0, index))
+
+            # 1
+            if len(vehicle.unloaded_route) != 0:
+                queue.append((0, 1, index)) ##### 가중치 결정?
+
+        queue.sort(key=lambda x: x[:2], reverse=True)
+        print(f'depth : {depth}')
+        vehicle_status(vehicles)
+        for index, (_, ls_type, vehicle_index) in enumerate(queue):
+            if index != len(queue)-1 and random.random() < 0.4: continue
+            if ls_type == 0:
+                print('internal optimization')
+                vehicle = vehicles[vehicle_index]
+                new_vehicle = internal_optimization(vehicle)
+                print(vehicle.loaded_box_num,  new_vehicle.loaded_box_num)
+                vehicles[vehicle_index] = new_vehicle
+            else:
+                print('reassign destination')
+                reassign_destination(vehicles, vehicle_index)
+            break
+
+        return dfs(depth + 1)
+
+    vehicles = copy.deepcopy(original_vehicles)
+    i = 0
+    while time.time() - start_t < LOCAL_SEARCH_TIME_LIMIT:
+        print(f'dfs {i}')
+        if dfs(0):
+            return True, vehicles
+        vehicles = copy.deepcopy(original_vehicles)
+        i += 1
+
+    return False, original_vehicles
 
 def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
     num_vehicles = len(vehicle_capacities)
@@ -566,6 +687,8 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
 
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+
+    routing.SetFixedCostOfAllVehicles(150000)
 
     def demand_callback(from_index):
         node = manager.IndexToNode(from_index)
@@ -585,6 +708,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
     search_parameters.time_limit.seconds = CVRP_TIME_LIMIT
+    # search_parameters.log_search = True
 
     solution = routing.SolveWithParameters(search_parameters)
     if not solution:
@@ -602,15 +726,13 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
 
     return solution, routes
 
-def VRP(n, OD_matrix, orders) -> list[Vehicle]:
+def VRP(n, OD_matrix, orders, min_load_ratio=0.9, max_load_ratio=0.95) -> list[Vehicle]:
     demands = [0] * n
     for i in range(1, n):
         for order in orders[i]:
             demands[i] += box_volume[order.info]
     total_demand = sum(demands)
 
-    min_load_ratio = 0.80
-    max_load_ratio = 0.85
     print(total_demand / Vehicle.total_volume)
     print(total_demand / (Vehicle.total_volume * min_load_ratio))
     min_vehicle_num = math.ceil(total_demand / Vehicle.total_volume)
@@ -625,17 +747,13 @@ def VRP(n, OD_matrix, orders) -> list[Vehicle]:
         print("route not found")
         return
 
-    total_cost = 0
     vehicles = []
-    for i, route in enumerate(routes):
+    for route in routes:
         if len(route) != 2:
-            vehicle = Vehicle(route, OD_matrix, orders)
-            vehicle.load_box_bnb()
-            # vehicle.load_box_greedy()
+            vehicle = Vehicle(route, orders)
             vehicles.append(vehicle)
-            total_cost += int(vehicle.dist*0.5) + 150000
 
-    print(f'total cost : {total_cost:,}')
+    # if DEBUG: print(f'total cost : {total_cost:,}')
     return vehicles
 
 def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[Order], index_to_name):
@@ -660,25 +778,56 @@ def save(vehicles: list[Vehicle], destinations: dict[str, Point], orders: list[O
         ws.append([vehicle_id, route_order, 'Depot'])
     wb.save("Result.xlsx")
 
+def vehicle_status(vehicles: list[Vehicle]):
+    print('-'*30)
+    print('| status')
+    for index, vehicle in enumerate(vehicles):
+        print(f'| vehicle {index} : {vehicle.calc_load_factor()}')
+        print(f'| {len(vehicle.unloaded_route)} unloaded route num')
+        if vehicle.unloaded_route: print(f'| {vehicle.unloaded_route}')
+        print('|')
+    print('-'*30)
+
 def main(data_filename, distance_filename):
+    start_t = time.time()
     destinations, name_to_index, index_to_name = read_map(data_filename)
     n = len(destinations)
     OD_matrix = read_OD_matrix(n, name_to_index, distance_filename)
     orders = read_orders(n, name_to_index, data_filename)
+    if DEBUG: print(f'read file time : {time.time() - start_t}\n')
 
-    t = time.time()
-    vehicles = VRP(n, OD_matrix, orders)
-    print('time :', time.time() - t)
+    if DEBUG: print('start VRP')
+    vehicles = VRP(n, OD_matrix, orders, 0.90, 0.95)
+    if DEBUG: print(f'VRP time : {time.time() - start_t}\n')
 
-    for index, vehicle in enumerate(vehicles, 1):
-        print(f'Vehicle {index}')
-        print(vehicle.loaded_box_position_size)
-        filled_volume = vehicle.calc_filled_volume()
-        print(f'ratio : {filled_volume/vehicle.total_volume}')
-        assert vehicle.loaded_box_num == vehicle.box_num, 'load fail'
-        print()
-        # viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
-        # viewer.show()
+    if DEBUG: print('start load box')
+    for vehicle in vehicles: vehicle.load_box_bnb()
+    if DEBUG: print(f'loaded box : {time.time() - start_t}\n')
+
+    # if DEBUG:
+    #     for index, vehicle in enumerate(vehicles):
+    #         print(f'Vehicle {index}')
+    #         print(f'route : {vehicle.route}')
+    #     print()
+    
+    if DEBUG:
+        vehicle_status(vehicles)
+        # for vehicle in vehicles:
+        #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
+        #     viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
+        #     viewer.show()
+
+    if DEBUG: print('start local search')
+    success, vehicles = feasible_solution_local_search(vehicles, OD_matrix, orders)
+    print(f'{success = }')
+    if DEBUG: print(f'local search time : {time.time() - start_t}\n')
+
+    if DEBUG:
+        vehicle_status(vehicles)
+        # for vehicle in vehicles:
+        #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
+        #     viewer = visualize.box_viewer_3d(vehicle.loaded_box_position_size)
+        #     viewer.show()
 
     save(vehicles, destinations, orders, index_to_name)
 

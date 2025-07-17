@@ -192,14 +192,14 @@ def judge(data_file_name, distance_file_name):
     print(f'shuffling cost : {shuffling_cost}')
 
 if __name__ == "__main__":
-    data_file_name = 'Data_Set.json'
-    distance_file_name = 'distance-data.txt'
-    # data_file_name = 'additional_data.json'
-    # distance_file_name = 'additional_distance_data.txt'
+    # data_file_name = 'Data_Set.json'
+    # distance_file_name = 'distance-data.txt'
+    data_file_name = 'additional_data.json'
+    distance_file_name = 'additional_distance_data.txt'
     # assert basename(os.getcwd()) == 'routing'
 
     start_t = time.time()
-    # os.system(f'python311 main.py {data_file_name} {distance_file_name}')
+    os.system(f'python311 main.py {data_file_name} {distance_file_name}')
     running_time = time.time() - start_t
 
     print(f'{running_time=}')

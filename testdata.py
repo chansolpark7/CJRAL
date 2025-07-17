@@ -217,8 +217,6 @@ def export_distance_table(delivery_points, filename='additional_distance_data.tx
         f.writelines(lines)
     print(f"[✅] Distance table saved to '{filename}'")
 
-
-
 if __name__ == "__main__":
     total_delivery_points = int(input("Enter total number of delivery points: "))
     points, mains, roads = generate_city_network(total_delivery_points, seed=None)

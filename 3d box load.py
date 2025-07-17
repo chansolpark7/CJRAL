@@ -8,7 +8,7 @@ import numpy
 
 from main import *
 
-BOX_LOAD_TIME_LIMIT = 5
+BOX_LOAD_TIME_LIMIT = 0.05
 
 class Vehicle2D:
     X = 16
@@ -231,24 +231,31 @@ class Vehicle:
     Z = 18
     total_volume = X*Y*Z*1000
 
-    def __init__(self, route, OD_matrix, orders):
-        self.route = route
-        self.cost = 0
+    def __init__(self, route, orders):
+        self.route = route #
+        # self.cost = 0
         self.dist = 0
         self.used = [[[False]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
         self.depth = [[0] * self.Z for _ in range(self.X)]
-        self.box_informations = []
-        self.box_num = 0
-        self.loaded_box_position_size = []
-        self.loaded_box_num = 0
 
-        for index in self.route[1:-1]:
-            for box in orders[index]:
-                self.box_informations.append(box.info)
+        self.data_empty_volume = []
+        self.data_possible_volume = []
+
+        self.box_informations = [] #
+        self.box_route_index = [] #
+        for index, node in enumerate(self.route):
+            for box in orders[node]:
+                self.box_informations.append(box)
+                self.box_route_index.append(index)
         self.box_num = len(self.box_informations)
         self.box_informations.reverse()
+        self.box_route_index.reverse()
 
-        self.calculate_dist(OD_matrix)
+        self.loaded_box_position_size = []
+        self.loaded_box_num = 0
+        self.unloaded_route = []
+
+        # self.calculate_dist(OD_matrix)
 
     def calculate_dist(self, OD_matrix):
         length = len(self.route)
@@ -328,6 +335,9 @@ class Vehicle:
 
         return volume
 
+    def calc_load_factor(self):
+        return self.calc_filled_volume() / self.total_volume
+
     def get_possible_positions(self, size):
         size_x, size_y, size_z = size
         positions = []
@@ -363,8 +373,8 @@ class Vehicle:
         if box_informations != None:
             self.box_informations = box_informations
             self.box_num = len(self.box_informations)
-        possible_volume_data = []
-        empty_volume_data = []
+        self.data_possible_volume = []
+        self.data_empty_volume = []
 
         self.loaded_box_num = 0
         for info in self.box_informations:
@@ -386,17 +396,11 @@ class Vehicle:
                 self.loaded_box_position_size.append((best_fit_position, best_fit_size))
                 self.loaded_box_num += 1
 
-                possible_volume_data.append(best_fit_possible_volume)
-                empty_volume_data.append(self.calc_empty_volume())
+                self.data_possible_volume.append(best_fit_possible_volume)
+                self.data_empty_volume.append(self.calc_empty_volume())
             else: break
 
-        return possible_volume_data, empty_volume_data
-
-    def load_box_bnb(self, box_informations=None):
-        if box_informations != None:
-            self.box_informations = box_informations
-            self.box_num = len(self.box_informations)
-
+    def load_box_bnb(self):
         # b1 b2 전처리
         b1b2_boxes = [3 if i == 0 else 5 for i in self.box_informations if i != 2]
         def solution(boxes):
@@ -481,58 +485,147 @@ class Vehicle:
         # main
         vehicle_2d = Vehicle2D()
         vehicle_2d.load_box_bnb(box_informations_2d)
+
+        # unloaded_route_index 찾기
+        if vehicle_2d.loaded_box_num != vehicle_2d.box_num:
+            p = placement_index.index(vehicle_2d.loaded_box_num)
+            unloaded_route_index = self.box_route_index[p]
+        else:
+            unloaded_route_index = 0
+
         height = [0] * vehicle_2d.loaded_box_num
+        self.data_possible_volume = [self.total_volume]
+        self.data_empty_volume = [self.total_volume]
         for index, info_3d in enumerate(self.box_informations):
+            if self.box_route_index[index] <= unloaded_route_index: break
             p = placement_index[index]
-            if p >= vehicle_2d.loaded_box_num: continue
             position_2d, size_2d = vehicle_2d.loaded_box_position_size[p]
             position_3d = (*position_2d, height[p])
             size_3d = (*size_2d, [3, 5, 6][info_3d])
             height[p] += size_3d[2]
             self.load_box_at(position_3d, size_3d)
+            self.data_possible_volume.append(self.calc_possible_volume())
+            self.data_empty_volume.append(self.calc_empty_volume())
             self.loaded_box_position_size.append((position_3d, size_3d))
         self.loaded_box_num = len(self.loaded_box_position_size)
+
+        # 싣지 못한 목적지 unloaded_route에 저장, route, box_num 정리
+        if unloaded_route_index != 0:
+            self.unloaded_route = self.route[1:unloaded_route_index+1]
+            self.route = [self.route[0]] + self.route[unloaded_route_index+1:]
+            self.box_informations = self.box_informations[:self.loaded_box_num]
+            self.box_route_index = self.box_route_index[:self.loaded_box_num]
+            self.box_num = self.loaded_box_num
+
+
+def internal_optimization(vehicle: Vehicle, orders):
+    # print(len(vehicle.data_empty_volume), vehicle.loaded_box_num)
+    for box_index in range(vehicle.loaded_box_num-1, -1, -1):
+        if (vehicle.data_empty_volume[box_index+1] - vehicle.data_possible_volume[box_index+1]) / vehicle.total_volume < INTERNAL_OPTIMIZATION_THRESHOLD:
+            break
+    print(f'{box_index = }')
+    node = vehicle.box_route_index[box_index]
+    if node == len(vehicle.route)-2: node -= 1
+    new_route = vehicle.route[:]
+    # new_route[node], new_route[node + 12] = new_route[node + 12], new_route[node]
+    # new_route[node-6:node+6] = new_route[node-6:node+6][::-1]
+    print(new_route, node)
+    
+    new_vehicle = Vehicle(new_route, orders)
+    new_vehicle.load_box_bnb()
+    return new_vehicle
+
+def reassign_destination(vehicles: list[Vehicle], target_vehicle_index, orders):
+    min_ratio_vehicle_index = None
+    min_ratio = 1
+    for index, vehicle in enumerate(vehicles):
+        if index == target_vehicle_index: continue
+        ratio = vehicle.calc_load_factor()
+        if ratio < min_ratio:
+            min_ratio_vehicle_index = index
+            min_ratio = ratio
+
+    if min_ratio_vehicle_index != None:
+        v1 = vehicles[target_vehicle_index]
+        v2 = vehicles[min_ratio_vehicle_index]
+        new_route = v2.route[:-1] + v1.unloaded_route + [0]
+        v1.unloaded_route = []
+        new_vehicle = Vehicle(new_route, orders)
+        new_vehicle.load_box_bnb()
+        vehicles[min_ratio_vehicle_index] = new_vehicle
 
 def random_boxes(n):
     boxes = []
     for _ in range(n):
-        boxes.append(random.randint(0, 2))
+        # boxes.append(random.randint(0, 2))
+        boxes.append(random.choices([0, 1, 2], weights=[1/5, 2/5, 2/5])[0])
     return boxes
 
 def run():
-    destinations, name_to_index, index_to_name = read_map()
-    n = len(destinations)
-    OD_matrix = read_OD_matrix(n, name_to_index)
-    orders = read_orders(n, name_to_index)
-
+    # destinations, name_to_index, index_to_name = read_map()
+    # n = len(destinations)
+    # OD_matrix = read_OD_matrix(n, name_to_index)
+    # orders = read_orders(n, name_to_index)
     # vehicles = solve_VRP()
 
-    boxes = random_boxes(100)
-    print(boxes)
-
     t = time.time()
-    v = Vehicle([], OD_matrix, [])
-    # possible_volume_data, empty_volume_data = v.load_box_greedy(boxes)
-    v.load_box_bnb(boxes)
-    v.print_depth()
+
+    n1 = 70
+    n2 = 30
+    route1 = [0] + [i for i in range(1, n1+1)] + [0]
+    orders1 = [[]] + [random_boxes(random.randint(1, 2)) for i in range(n1)] + [[]]
+    route2 = [0] + [i for i in range(n1+1, n1+n2+1)] + [0]
+    orders = [[]] + [random_boxes(random.randint(1, 2)) for i in range(n1+n2)] + [[]]
+    # route = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 0]
+    # orders = [[], [1], [1], [1], [1, 1], [0, 1], [0, 1], [2], [1, 2], [1], [1, 1], [2, 1], [2, 0], [1, 1], [2], [2, 2], [0], [1], [2, 2], [1, 0], [1], [2, 2], [1], [1], [1], [1], [1], [2], [1], [1], [2], [0], [2], [1], [1], [1], [1], [2, 2], [0], [2], [1, 0], [1], [0, 1], [1], [2], [2, 1], [1], [2, 1], [1], [2], [1, 0], [2, 0], [2], [2, 2], [1], [2, 0], [2, 0], [2, 2], [1], [2, 1], [0], [2, 0], [1, 2], [2, 1], [0], [0, 0], [2, 1], [0], [2, 2], [2, 1], [1], [2], [2, 0], [1, 1], [1], [2, 2], [1, 2], [2, 0], [1], [2, 1], [0, 2], [1, 1], [0, 2], [2, 2], [1, 1], [1, 0], [2], [0, 0], [1], [2], [1, 1], [1], [0], [2], [1], [2, 0], [2], [1, 0], [2], [0, 1], [1], [2], [1, 2], [2], [2, 1], [2, 2], [2], [1], [1, 0], [2], [1, 0], [1], [0], [1, 1], [1], [2], [1, 2], [0, 2], [1], [1, 2], [2, 1], [1], [0], [1, 1], [0], [1, 2], [1, 2], [2], [2, 0], [2, 2], [1], [1], [1], [2], [1, 0], [1, 1], [0, 2], [2], [1], [2], [2], [0], [2, 0], [2], [2, 2], [2, 1], [1], [1, 0], [2], [0], [2], [2, 0], [2, 2], [1], [1, 1], [1, 1], [2, 1], [0, 2], [2, 2], [2, 1], [1], [1], [2, 2], [1, 2], [2, 0], [2], [0, 1], [2], [2, 2], [1], [2, 2], [2, 2], [2], [2], [0], [1], [1, 2], [0], [1], [2, 2], [0, 0], [1, 0], [1], [0, 1], [1], [1], [0], [0, 2], [1], [2, 1], [2, 1], [0], [0, 2], [1], [2, 1], [2, 1], [2, 1], [1], [1], [2, 0], [1, 1], []]
+    print(route1, orders)
+    print(route2, orders)
+    print()
+    v1 = Vehicle(route1, orders)
+    v1.load_box_bnb()
+    v2 = Vehicle(route2, orders)
+    v2.load_box_bnb()
+    vehicles = [v1, v2]
     print('time :', time.time() - t)
 
-    print(v.box_informations)
-    print(v.loaded_box_num)
+    print(f'{v1.calc_load_factor() = }')
+    print(f'{v2.calc_load_factor() = }')
+    print(v1.unloaded_route)
+    print(v2.unloaded_route)
+    print()
+    visualize.box_viewer_3d(v1.loaded_box_position_size).show()
+    visualize.box_viewer_3d(v2.loaded_box_position_size).show()
+
+    print('reaassign destination')
+    reassign_destination(vehicles, 0, orders)
+    v1, v2 = vehicles
+
+    print(f'{v1.calc_load_factor() = }')
+    print(f'{v2.calc_load_factor() = }')
+    print(v1.unloaded_route)
+    print(v2.unloaded_route)
+    print()
+    visualize.box_viewer_3d(v1.loaded_box_position_size).show()
+    visualize.box_viewer_3d(v2.loaded_box_position_size).show()
+    # empty = v1.calc_empty_volume()
+    # possible = v1.calc_possible_volume()
     
-    volume1 = v.calc_empty_volume()
-    volume2 = v.calc_filled_volume()
-    print(volume1)
-    print(volume2)
-    print(volume1+volume2, volume1+volume2 == v.total_volume)
-    print(v.calc_possible_volume())
-    r = v.calc_filled_volume()/v.total_volume
-    print(r)
+    # v = Vehicle([], [])
+    # boxes = random_boxes(100)
+    # print(boxes)
+    # # v.load_box_greedy(boxes)
+    # v.load_box_bnb(boxes)
 
-    # visualize.graph(possible = possible_volume_data, empty = empty_volume_data)
+    # v.print_depth()
 
-    viewer = visualize.box_viewer_3d(v.loaded_box_position_size)
-    viewer.show()
+
+    # visualize.graph(possible = v1.data_possible_volume, empty = v1.data_empty_volume)
+
+    # viewer = visualize.box_viewer_3d(v1.loaded_box_position_size)
+    # viewer.show()
+    # viewer = visualize.box_viewer_3d(new_v.loaded_box_position_size)
+    # viewer.show()
+
 
 
 if __name__ == '__main__':

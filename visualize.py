@@ -39,7 +39,7 @@ class box_viewer_3d:
         self.lines = []
         self.artists = []
 
-        self.colors = [[random.random() * 0.7 + 0.3 for _ in range(3)] for _ in range(100)]
+        self.colors = [[random.random() * 0.7 + 0.3 for _ in range(3)] for _ in range(200)]
         self.update(self.slider.val)
 
     def key_callback(self, event):
@@ -133,7 +133,7 @@ class box_viewer_2d:
         self.box_list = box_list
         self.lines = []
 
-        self.colors = [[random.random() * 0.7 + 0.3 for _ in range(3)] for _ in range(100)]
+        self.colors = [[random.random() * 0.7 + 0.3 for _ in range(3)] for _ in range(200)]
         self.update(self.slider.val)
 
     def key_callback(self, event):
