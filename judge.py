@@ -247,6 +247,9 @@ if __name__ == "__main__":
 
             start_t = time.time()
             result = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
+            if result != 0:
+                print(f'in testing {i} error raised')
+                exit()
             running_time = time.time() - start_t
 
             print(f'{running_time=}')

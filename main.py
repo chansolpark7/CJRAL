@@ -16,14 +16,14 @@ Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 
 DEBUG = True
 LOCAL_SEARCH_DEPTH_LIMIT = 10
-INTERNAL_OPTIMIZATION_THRESHOLD = 0.01
+INTERNAL_OPTIMIZATION_THRESHOLD = 0.05
 
 if DEBUG:
     import visualize
 
     CVRP_TIME_LIMIT = 10
     BOX_LOAD_TIME_LIMIT = 5
-    LOCAL_SEARCH_TIME_LIMIT = 30
+    LOCAL_SEARCH_TIME_LIMIT = 150
 else:
     CVRP_TIME_LIMIT = 10*60
     BOX_LOAD_TIME_LIMIT = 5
@@ -607,6 +607,7 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
         new_route[node], new_route[node + 1] = new_route[node + 1], new_route[node]
         
         new_vehicle = Vehicle(new_route, orders)
+        new_vehicle.load_box_bnb()
         return new_vehicle
 
     def reassign_destination(vehicles: list[Vehicle], target_vehicle_index):
@@ -640,9 +641,9 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
         queue: list[tuple[float, int, Vehicle]] = []
         for index, vehicle in enumerate(vehicles):
             # 0
-            # r = (vehicle.data_empty_volume[-1] - vehicle.data_possible_volume[-1]) / vehicle.total_volume
-            # if r > INTERNAL_OPTIMIZATION_THRESHOLD and len(vehicle.route) > 3:
-            #     queue.append((r, 0, index))
+            r = (vehicle.data_empty_volume[-1] - vehicle.data_possible_volume[-1]) / vehicle.total_volume
+            if r > INTERNAL_OPTIMIZATION_THRESHOLD and len(vehicle.route) > 3:
+                queue.append((r, 0, index))
 
             # 1
             if len(vehicle.unloaded_route) != 0:
@@ -798,7 +799,7 @@ def main(data_filename, distance_filename):
     if DEBUG: print(f'read file time : {time.time() - start_t}\n')
 
     if DEBUG: print('start VRP')
-    vehicles = VRP(n, OD_matrix, orders, 0.90, 0.90)
+    vehicles = VRP(n, OD_matrix, orders, 0.90, 0.95)
     if DEBUG: print(f'VRP time : {time.time() - start_t}\n')
 
     if DEBUG: print('start load box')
