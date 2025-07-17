@@ -15,7 +15,7 @@ Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 # Distance = namedtuple('Distance', ['time', 'meter'])
 
 DEBUG = True
-LOCAL_SEARCH_DEPTH_LIMIT = 10
+LOCAL_SEARCH_DEPTH_LIMIT = 6
 INTERNAL_OPTIMIZATION_THRESHOLD = 0.05
 
 if DEBUG:
@@ -27,7 +27,7 @@ if DEBUG:
 else:
     CVRP_TIME_LIMIT = 10*60
     BOX_LOAD_TIME_LIMIT = 5
-    LOCAL_SEARCH_TIME_LIMIT = 60 #
+    LOCAL_SEARCH_TIME_LIMIT = 5 * 60
 
 box_size = [
     [30, 40, 30],
@@ -36,6 +36,18 @@ box_size = [
 ]
 
 box_volume = [i[0]*i[1]*i[2] for i in box_size]
+
+class LOGGER:
+    def __init__(self, interval=0.1, enable=True):
+        self.interval = interval
+        self.enable = enable
+        self.last_log = time.time()
+        self.datas = []
+
+    def log(self, data):
+        if self.enable and time.time() - self.last_log > self.interval:
+            self.datas.append(data)
+            self.last_log = time.time()
 
 def read_map(filename='Data_Set.json'):
     with open(filename, 'rt', encoding='utf-8') as file:
@@ -417,7 +429,7 @@ class Vehicle:
         for x in range(self.X-size_x+1):
             for z in range(self.Z-size_z+1):
                 y = max([max(i[z:z+size_z]) for i in self.depth[x:x+size_x]])
-                if y + size_y >= self.Y: continue
+                if y + size_y > self.Y: continue
                 if z == 0:
                     positions.append((x, y, z))
                 else:
@@ -439,18 +451,12 @@ class Vehicle:
         else:
             return (5, 5, 6), (5, 6, 5), (6, 5, 5)
 
-    def load_box_greedy(self, box_informations=None):
+    def load_box_greedy(self, node, orders):
         # 30x40x30, 30x50x40, 50x60x50cm
         # 160*280*180 x y z
-
-        if box_informations != None:
-            self.box_informations = box_informations
-            self.box_num = len(self.box_informations)
-        self.data_possible_volume = []
-        self.data_empty_volume = []
-
-        self.loaded_box_num = 0
-        for info in self.box_informations:
+        loaded_box_position_size = []
+        for index, box in enumerate(orders[node]):
+            info = box.info
             best_fit_position = None
             best_fit_size = None
             best_fit_possible_volume = -1
@@ -466,12 +472,27 @@ class Vehicle:
                         best_fit_possible_volume = possible_volume
             if best_fit_position != None:
                 self.load_box_at(best_fit_position, best_fit_size)
-                self.loaded_box_position_size.append((best_fit_position, best_fit_size))
+                loaded_box_position_size.append((best_fit_position, best_fit_size))
+                self.box_num += 1
                 self.loaded_box_num += 1
 
                 self.data_possible_volume.append(best_fit_possible_volume)
                 self.data_empty_volume.append(self.calc_empty_volume())
-            else: break
+            else:
+                for i in range(index):
+                    position, size = loaded_box_position_size.pop()
+                    self.unload_box_at(position, size)
+                    self.box_num -= 1
+                    self.loaded_box_num -= 1
+
+                    self.data_possible_volume.pop()
+                    self.data_empty_volume.pop()
+                return False
+        self.route = self.route[:-1] + [node, 0]
+        self.loaded_box_position_size = loaded_box_position_size[::-1] + self.loaded_box_position_size
+        self.box_informations = [box.info for box in orders[node]][::-1] + self.box_informations
+        self.box_route_index = [len(self.route)-2] * len(orders[node]) + self.box_route_index
+        return True
 
     def load_box_bnb(self, box_informations=None):
         if box_informations != None:
@@ -594,9 +615,7 @@ class Vehicle:
             self.box_route_index = self.box_route_index[:self.loaded_box_num]
             self.box_num = self.loaded_box_num
 
-def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, orders): # LS
-    start_t = time.time()
-
+def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, orders, start_t): # LS
     def internal_optimization(vehicle: Vehicle):
         for box_index in range(vehicle.loaded_box_num-1, -1, -1):
             if (vehicle.data_empty_volume[box_index+1] - vehicle.data_possible_volume[box_index+1]) / vehicle.total_volume < INTERNAL_OPTIMIZATION_THRESHOLD:
@@ -630,9 +649,45 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
             new_vehicle.load_box_bnb()
             vehicles[min_ratio_vehicle_index] = new_vehicle
 
+    def apply_greedy_loading(vehicles: list[Vehicle]):
+        unloaded_route = []
+        for vehicle in vehicles:
+            unloaded_route += vehicle.unloaded_route
+            vehicle.unloaded_route = []
+
+        demands = defaultdict(int)
+        for node in unloaded_route:
+            for order in orders[node]:
+                demands[node] += box_volume[order.info]
+
+        loading_order = []
+        for node, volume in demands.items():
+            loading_order.append((volume, node))
+        loading_order.sort(reverse=True)
+
+        unloaded_route = []
+        for volume, node in loading_order:
+            empty_volume_vehicle_list: list[tuple[int, Vehicle]] = []
+            for vehicle in vehicles:
+                empty_volume_vehicle_list.append((vehicle.calc_empty_volume(), vehicle))
+            empty_volume_vehicle_list.sort(key=lambda x: x[0])
+
+            for empty_volume, vehicle in empty_volume_vehicle_list:
+                if empty_volume < volume: continue
+                if vehicle.load_box_greedy(node, orders): break
+            else:
+                unloaded_route.append(node)
+        return unloaded_route
+
     def dfs(depth):
         nonlocal vehicles
-        if depth == LOCAL_SEARCH_DEPTH_LIMIT: return False
+        if depth == LOCAL_SEARCH_DEPTH_LIMIT:
+            unloaded_route = apply_greedy_loading(vehicles)
+            if unloaded_route: return False
+            else:
+                print('greedy applied')
+                return True
+
         if time.time() - start_t > LOCAL_SEARCH_TIME_LIMIT: return False
 
         if all(len(vehicle.unloaded_route) == 0 for vehicle in vehicles): return True
@@ -650,7 +705,7 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
             if len(vehicle.unloaded_route) != 0:
                 queue.append((0, 1, index)) ##### 가중치 결정?
 
-        # queue.sort(key=lambda x: x[:2], reverse=True)
+        # queue.sort(key=lambda x: x[:2], reverse=True) ##### 선택 기준?
         random.shuffle(queue)
         print(f'depth : {depth}')
         vehicle_status(vehicles)
@@ -813,7 +868,7 @@ def main(data_filename, distance_filename):
         #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
 
     if DEBUG: print('start local search')
-    success, vehicles = feasible_solution_local_search(vehicles, OD_matrix, orders)
+    success, vehicles = feasible_solution_local_search(vehicles, OD_matrix, orders, start_t + CVRP_TIME_LIMIT)
     print(f'{success = }')
     if DEBUG: print(f'local search time : {time.time() - start_t}\n')
 

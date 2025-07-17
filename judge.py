@@ -234,13 +234,14 @@ def run_test(command):
     ret = os.system(command)
     running_time = time.time() - start_t
 
+    msg = ''
     if ret == 0:
         try:
-            msg = ''
             total_cost = judge(data_file_name, distance_file_name)
-        except Exception as msg:
+        except Exception as reason:
             total_cost = 0
-            print(msg)
+            msg = str(reason)
+            print(reason)
     else:
         msg = 'error raised in main'
         total_cost = 0

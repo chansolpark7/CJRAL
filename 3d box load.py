@@ -8,7 +8,7 @@ import numpy
 
 from main import *
 
-BOX_LOAD_TIME_LIMIT = 0.05
+BOX_LOAD_TIME_LIMIT = 5
 
 class Vehicle2D:
     X = 16
@@ -232,8 +232,7 @@ class Vehicle:
     total_volume = X*Y*Z*1000
 
     def __init__(self, route, orders):
-        self.route = route #
-        # self.cost = 0
+        self.route = route
         self.dist = 0
         self.used = [[[False]*self.Z for _ in range(self.Y)] for _ in range(self.X)]
         self.depth = [[0] * self.Z for _ in range(self.X)]
@@ -241,8 +240,8 @@ class Vehicle:
         self.data_empty_volume = []
         self.data_possible_volume = []
 
-        self.box_informations = [] #
-        self.box_route_index = [] #
+        self.box_informations = []
+        self.box_route_index = []
         for index, node in enumerate(self.route):
             for box in orders[node]:
                 self.box_informations.append(box)
@@ -255,8 +254,6 @@ class Vehicle:
         self.loaded_box_num = 0
         self.unloaded_route = []
 
-        # self.calculate_dist(OD_matrix)
-
     def calculate_dist(self, OD_matrix):
         length = len(self.route)
         self.dist = 0
@@ -264,6 +261,7 @@ class Vehicle:
             start = self.route[i]
             end = self.route[i+1]
             self.dist += OD_matrix[start][end]
+        return self.dist
 
     def load_box_at(self, position, size):
         x, y, z = position
@@ -344,7 +342,7 @@ class Vehicle:
         for x in range(self.X-size_x+1):
             for z in range(self.Z-size_z+1):
                 y = max([max(i[z:z+size_z]) for i in self.depth[x:x+size_x]])
-                if y + size_y >= self.Y: continue
+                if y + size_y > self.Y: continue
                 if z == 0:
                     positions.append((x, y, z))
                 else:
@@ -366,18 +364,12 @@ class Vehicle:
         else:
             return (5, 5, 6), (5, 6, 5), (6, 5, 5)
 
-    def load_box_greedy(self, box_informations=None):
+    def load_box_greedy(self, node, orders):
         # 30x40x30, 30x50x40, 50x60x50cm
         # 160*280*180 x y z
-
-        if box_informations != None:
-            self.box_informations = box_informations
-            self.box_num = len(self.box_informations)
-        self.data_possible_volume = []
-        self.data_empty_volume = []
-
-        self.loaded_box_num = 0
-        for info in self.box_informations:
+        for index, box in enumerate(orders[node]):
+            # info = box.info
+            info = box
             best_fit_position = None
             best_fit_size = None
             best_fit_possible_volume = -1
@@ -394,11 +386,26 @@ class Vehicle:
             if best_fit_position != None:
                 self.load_box_at(best_fit_position, best_fit_size)
                 self.loaded_box_position_size.append((best_fit_position, best_fit_size))
+                self.box_num += 1
                 self.loaded_box_num += 1
 
                 self.data_possible_volume.append(best_fit_possible_volume)
                 self.data_empty_volume.append(self.calc_empty_volume())
-            else: break
+            else:
+                for i in range(index):
+                    position, size = self.loaded_box_position_size.pop()
+                    self.unload_box_at(position, size)
+                    self.box_num -= 1
+                    self.loaded_box_num -= 1
+
+                    self.data_possible_volume.pop()
+                    self.data_empty_volume.pop()
+                return False
+        self.route = self.route[:-1] + [node, 0]
+        # self.box_informations = [box.info for box in orders[node]][::-1] + self.box_informations
+        self.box_informations = [box for box in orders[node]][::-1] + self.box_informations
+        self.box_route_index = [node] * len(orders[node]) + self.box_route_index
+        return True
 
     def load_box_bnb(self):
         # b1 b2 전처리
@@ -554,11 +561,42 @@ def reassign_destination(vehicles: list[Vehicle], target_vehicle_index, orders):
         new_vehicle.load_box_bnb()
         vehicles[min_ratio_vehicle_index] = new_vehicle
 
+def apply_greedy_loading(vehicles: list[Vehicle], orders):
+    unloaded_route = []
+    for vehicle in vehicles:
+        unloaded_route += vehicle.unloaded_route
+        vehicle.unloaded_route = []
+
+    demands = defaultdict(int)
+    for node in unloaded_route:
+        for order in orders[node]:
+            # demands[node] += box_volume[order.info]
+            demands[node] += box_volume[order]
+
+    loading_order = []
+    for node, volume in demands.items():
+        loading_order.append((volume, node))
+    loading_order.sort(reverse=True)
+
+    unloaded_route = []
+    for volume, node in loading_order:
+        empty_volume_vehicle_list: list[tuple[int, Vehicle]] = []
+        for vehicle in vehicles:
+            empty_volume_vehicle_list.append((vehicle.calc_empty_volume(), vehicle))
+        empty_volume_vehicle_list.sort()
+
+        for empty_volume, vehicle in empty_volume_vehicle_list:
+            if empty_volume < volume: continue
+            if vehicle.load_box_greedy(node, orders): break
+        else:
+            unloaded_route.append(node)
+    return unloaded_route
+
 def random_boxes(n):
     boxes = []
     for _ in range(n):
-        # boxes.append(random.randint(0, 2))
-        boxes.append(random.choices([0, 1, 2], weights=[1/5, 2/5, 2/5])[0])
+        boxes.append(random.randint(0, 2))
+        # boxes.append(random.choices([0, 1, 2], weights=[1/5, 2/5, 2/5])[0])
     return boxes
 
 def run():
@@ -568,45 +606,67 @@ def run():
     # orders = read_orders(n, name_to_index)
     # vehicles = solve_VRP()
 
-    t = time.time()
+    # t = time.time()
 
-    n1 = 70
-    n2 = 30
-    route1 = [0] + [i for i in range(1, n1+1)] + [0]
-    orders1 = [[]] + [random_boxes(random.randint(1, 2)) for i in range(n1)] + [[]]
-    route2 = [0] + [i for i in range(n1+1, n1+n2+1)] + [0]
-    orders = [[]] + [random_boxes(random.randint(1, 2)) for i in range(n1+n2)] + [[]]
-    # route = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 0]
-    # orders = [[], [1], [1], [1], [1, 1], [0, 1], [0, 1], [2], [1, 2], [1], [1, 1], [2, 1], [2, 0], [1, 1], [2], [2, 2], [0], [1], [2, 2], [1, 0], [1], [2, 2], [1], [1], [1], [1], [1], [2], [1], [1], [2], [0], [2], [1], [1], [1], [1], [2, 2], [0], [2], [1, 0], [1], [0, 1], [1], [2], [2, 1], [1], [2, 1], [1], [2], [1, 0], [2, 0], [2], [2, 2], [1], [2, 0], [2, 0], [2, 2], [1], [2, 1], [0], [2, 0], [1, 2], [2, 1], [0], [0, 0], [2, 1], [0], [2, 2], [2, 1], [1], [2], [2, 0], [1, 1], [1], [2, 2], [1, 2], [2, 0], [1], [2, 1], [0, 2], [1, 1], [0, 2], [2, 2], [1, 1], [1, 0], [2], [0, 0], [1], [2], [1, 1], [1], [0], [2], [1], [2, 0], [2], [1, 0], [2], [0, 1], [1], [2], [1, 2], [2], [2, 1], [2, 2], [2], [1], [1, 0], [2], [1, 0], [1], [0], [1, 1], [1], [2], [1, 2], [0, 2], [1], [1, 2], [2, 1], [1], [0], [1, 1], [0], [1, 2], [1, 2], [2], [2, 0], [2, 2], [1], [1], [1], [2], [1, 0], [1, 1], [0, 2], [2], [1], [2], [2], [0], [2, 0], [2], [2, 2], [2, 1], [1], [1, 0], [2], [0], [2], [2, 0], [2, 2], [1], [1, 1], [1, 1], [2, 1], [0, 2], [2, 2], [2, 1], [1], [1], [2, 2], [1, 2], [2, 0], [2], [0, 1], [2], [2, 2], [1], [2, 2], [2, 2], [2], [2], [0], [1], [1, 2], [0], [1], [2, 2], [0, 0], [1, 0], [1], [0, 1], [1], [1], [0], [0, 2], [1], [2, 1], [2, 1], [0], [0, 2], [1], [2, 1], [2, 1], [2, 1], [1], [1], [2, 0], [1, 1], []]
-    print(route1, orders)
-    print(route2, orders)
-    print()
-    v1 = Vehicle(route1, orders)
-    v1.load_box_bnb()
-    v2 = Vehicle(route2, orders)
-    v2.load_box_bnb()
-    vehicles = [v1, v2]
-    print('time :', time.time() - t)
 
-    print(f'{v1.calc_load_factor() = }')
-    print(f'{v2.calc_load_factor() = }')
-    print(v1.unloaded_route)
-    print(v2.unloaded_route)
-    print()
-    visualize.box_viewer_3d(v1.loaded_box_position_size).show()
-    visualize.box_viewer_3d(v2.loaded_box_position_size).show()
 
-    print('reaassign destination')
-    reassign_destination(vehicles, 0, orders)
-    v1, v2 = vehicles
+    # n1 = 70
+    # n2 = 30
+    # route1 = [0] + [i for i in range(1, n1+1)] + [0]
+    # route2 = [0] + [i for i in range(n1+1, n1+n2+1)] + [0]
+    # orders = [[]] + [random_boxes(random.randint(1, 2)) for i in range(n1+n2)] + [[]]
+    # # route = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 0]
+    # # orders = [[], [1], [1], [1], [1, 1], [0, 1], [0, 1], [2], [1, 2], [1], [1, 1], [2, 1], [2, 0], [1, 1], [2], [2, 2], [0], [1], [2, 2], [1, 0], [1], [2, 2], [1], [1], [1], [1], [1], [2], [1], [1], [2], [0], [2], [1], [1], [1], [1], [2, 2], [0], [2], [1, 0], [1], [0, 1], [1], [2], [2, 1], [1], [2, 1], [1], [2], [1, 0], [2, 0], [2], [2, 2], [1], [2, 0], [2, 0], [2, 2], [1], [2, 1], [0], [2, 0], [1, 2], [2, 1], [0], [0, 0], [2, 1], [0], [2, 2], [2, 1], [1], [2], [2, 0], [1, 1], [1], [2, 2], [1, 2], [2, 0], [1], [2, 1], [0, 2], [1, 1], [0, 2], [2, 2], [1, 1], [1, 0], [2], [0, 0], [1], [2], [1, 1], [1], [0], [2], [1], [2, 0], [2], [1, 0], [2], [0, 1], [1], [2], [1, 2], [2], [2, 1], [2, 2], [2], [1], [1, 0], [2], [1, 0], [1], [0], [1, 1], [1], [2], [1, 2], [0, 2], [1], [1, 2], [2, 1], [1], [0], [1, 1], [0], [1, 2], [1, 2], [2], [2, 0], [2, 2], [1], [1], [1], [2], [1, 0], [1, 1], [0, 2], [2], [1], [2], [2], [0], [2, 0], [2], [2, 2], [2, 1], [1], [1, 0], [2], [0], [2], [2, 0], [2, 2], [1], [1, 1], [1, 1], [2, 1], [0, 2], [2, 2], [2, 1], [1], [1], [2, 2], [1, 2], [2, 0], [2], [0, 1], [2], [2, 2], [1], [2, 2], [2, 2], [2], [2], [0], [1], [1, 2], [0], [1], [2, 2], [0, 0], [1, 0], [1], [0, 1], [1], [1], [0], [0, 2], [1], [2, 1], [2, 1], [0], [0, 2], [1], [2, 1], [2, 1], [2, 1], [1], [1], [2, 0], [1, 1], []]
+    # print(route1, orders)
+    # print(route2, orders)
+    # print()
+    # v1 = Vehicle(route1, orders)
+    # v1.load_box_bnb()
+    # v2 = Vehicle(route2, orders)
+    # v2.load_box_bnb()
+    # vehicles = [v1, v2]
+    # print('time :', time.time() - t)
 
-    print(f'{v1.calc_load_factor() = }')
-    print(f'{v2.calc_load_factor() = }')
-    print(v1.unloaded_route)
-    print(v2.unloaded_route)
-    print()
-    visualize.box_viewer_3d(v1.loaded_box_position_size).show()
-    visualize.box_viewer_3d(v2.loaded_box_position_size).show()
+    # print(f'{v1.calc_load_factor() = }')
+    # print(f'{v2.calc_load_factor() = }')
+    # print(v1.unloaded_route)
+    # print(v2.unloaded_route)
+    # print()
+    # visualize.box_viewer_3d(v1.loaded_box_position_size).show()
+    # visualize.box_viewer_3d(v2.loaded_box_position_size).show()
+
+    # print('reassign destination')
+    # reassign_destination(vehicles, 0, orders)
+    # v1, v2 = vehicles
+
+    # print(f'{v1.calc_load_factor() = }')
+    # print(f'{v2.calc_load_factor() = }')
+    # print(v1.unloaded_route)
+    # print(v2.unloaded_route)
+    # print()
+    # visualize.box_viewer_3d(v1.loaded_box_position_size).show()
+    # visualize.box_viewer_3d(v2.loaded_box_position_size).show()
+
+
+    n = 70
+    route = [0] + [i for i in range(1, n+1)] + [0]
+    orders = [[]] + [random_boxes(random.randint(1, 2)) for i in range(n)] + [[]]
+    # route = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 0]
+    # orders = [[], [2], [1], [1], [0, 1], [2, 0], [1], [1, 1], [2], [2], [0, 2], [1, 2], [1], [2, 2], [2], [1], [1, 2], [1], [0], [2, 2], [2, 1], [0, 0], [1], [0, 2], [1], [2], [0], [1], [1, 2], [0], [0], [2], [2, 2], [2, 0], [1, 1], [1, 0], [2, 1], [2, 0], [2, 1], [1, 1], [2], [2], [0], [0], [1, 1], [2], [1, 0], [1, 2], [1, 2], [1], [0], [1], [0, 0], [2, 1], [0, 0], [2, 0], [0], [2, 2], [1, 0], [1], [2, 2], [0], [0, 0], [1], [1], [2, 0], [2, 0], [2], [1], [1, 1], [1], []]
+    print(route)
+    print(orders)
+    v = Vehicle(route, orders)
+    v.load_box_bnb()
+
+    print(v.unloaded_route)
+    visualize.box_viewer_3d(v.loaded_box_position_size).show()
+
+    if v.unloaded_route:
+        unloaded_route = apply_greedy_loading([v], orders)
+        print(unloaded_route)
+
+        visualize.box_viewer_3d(v.loaded_box_position_size).show()
+    
     # empty = v1.calc_empty_volume()
     # possible = v1.calc_possible_volume()
     
@@ -618,15 +678,12 @@ def run():
 
     # v.print_depth()
 
-
     # visualize.graph(possible = v1.data_possible_volume, empty = v1.data_empty_volume)
 
     # viewer = visualize.box_viewer_3d(v1.loaded_box_position_size)
     # viewer.show()
     # viewer = visualize.box_viewer_3d(new_v.loaded_box_position_size)
     # viewer.show()
-
-
 
 if __name__ == '__main__':
     run()
