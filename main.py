@@ -622,7 +622,7 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
         if min_ratio_vehicle_index != None:
             v1 = vehicles[target_vehicle_index]
             v2 = vehicles[min_ratio_vehicle_index]
-            new_route = [0] + v1.unloaded_route + v2.route[1:]
+            new_route = [0] + v2.unloaded_route + v1.unloaded_route + v2.route[1:]
             v1.unloaded_route = []
             new_vehicle = Vehicle(new_route, orders)
             new_vehicle.load_box_bnb()
