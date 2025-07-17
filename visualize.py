@@ -2,16 +2,33 @@ import main
 import random
 import sys
 import numpy as np
+import openpyxl
+from collections import namedtuple
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.widgets import Slider
 import matplotlib.ticker as ticker
 
-# main의 어떤 함수를 이용해서 depo, destinations 정보 불러오는 구조
-# main.read_map() -> [depo, destinations]
-# - depo = {'longtitude': ~, 'latitude': ~}
-# - destinations[destination_id] = {'longtitude': ~, 'latitude': ~}
+Data = namedtuple(
+    'Data',
+    [
+        'Vehicle_ID',
+        'Route_Order',
+        'Destination',
+        'Order_Number',
+        'Box_ID',
+        'Stacking_Order',
+        'Lower_Left_X',
+        'Lower_Left_Y',
+        'Lower_Left_Z',
+        'Longitude',
+        'Latitude',
+        'Box_Width',
+        'Box_Length',
+        'Box_Height'
+    ]
+)
 
 class box_viewer_3d:
     def __init__(self, box_list, mode=1):
@@ -233,23 +250,46 @@ def benchmark(result):
     plt.tight_layout()
     plt.show()
 
-def plot_vrp():
-    data_file_name = 'Data_Set.json'
-    distance_file_name = 'distance-data.txt'
-    # data_file_name = 'additional_data.json'
-    # distance_file_name = 'additional_distance_data.txt'
+def plot_vrp(data_file_name, distance_file_name):
     destinations, name_to_index, index_to_name = main.read_map(data_file_name)
     n = len(destinations)
     OD_matrix = main.read_OD_matrix(n, name_to_index, distance_file_name)
     orders = main.read_orders(n, name_to_index, data_file_name)
-    vehicles = main.VRP(n, OD_matrix, orders)
+
+    result_file_name = 'Result.xlsx'
+    wb = openpyxl.load_workbook(result_file_name)
+    wb.sheetnames
+    ws = wb[wb.sheetnames[0]]
+
+    datas: list[list[Data]] = []
+    for index, row in enumerate(ws.rows):
+        if index == 0: continue
+        data = Data(*map(lambda x: x.value, row))
+        if len(datas) == data.Vehicle_ID:
+            datas.append([])
+        datas[data.Vehicle_ID].append(data)
+
+    vehicles: list[main.Vehicle] = []
+    for data in datas:
+        route = []
+        for d in data:
+            node = name_to_index[d.Destination]
+            if not route or route[-1] != node: route.append(node)
+        vehicle = main.Vehicle(route, orders)
+        for d in data:
+            if d.Box_ID == None: continue
+            size = (d.Box_Width//10, d.Box_Length//10, d.Box_Height//10)
+            position = (d.Lower_Left_X//10, 28-(d.Lower_Left_Y//10 + size[1]), d.Lower_Left_Z//10)
+            vehicle.load_box_at(position, size)
+        vehicle.calculate_dist(OD_matrix)
+        vehicles.append(vehicle)
     plt.figure(figsize=(10, 8))
 
     # depot 그리기
     plt.scatter(destinations['Depot'].longitude, destinations['Depot'].latitude, c='red', marker='s', s=100, label='Depot')
 
     # destination 그리기
-    for dest_id, pos in list(destinations.items())[1:]: # dest_id에 'D_00001' 이런 거 담기고 pos에 {'longitude': 0, 'latitude': 0} 이런 거 담김
+    for dest_id, pos in list(destinations.items())[1:]:
         x = pos.longitude
         y = pos.latitude
         plt.scatter(x, y, c='blue')
@@ -257,7 +297,6 @@ def plot_vrp():
 
     # 차량 경로 그리기
     for vehicle in vehicles:
-        route = vehicle.route
         x_vals = []
         y_vals = []
         for route_index in vehicle.route:
@@ -280,7 +319,13 @@ def plot_vrp():
     plt.legend()
     plt.grid(True)
     plt.show()
-    
+
 if __name__ == "__main__":
-    # plot_vrp()
-    benchmark([((0, 17.863848447799683, 1992247), (0, 13.12440800666809, 2133084)), ((0, 12.218220710754395, 1098969), (0, 12.001279830932617, 1249722)), ((0, 67.00232529640198, 0), (0, 13.502542495727539, 2942740)), ((0, 155.60183548927307, 2528759), (0, 13.454965353012085, 2801769)), ((0, 29.114457607269287, 2501728), (0, 13.28079080581665, 2625760))])
+    data_file_name = 'Data_Set.json'
+    distance_file_name = 'distance-data.txt'
+    # data_file_name = 'additional_data.json'
+    # distance_file_name = 'additional_distance_data.txt'
+
+    
+
+    plot_vrp(data_file_name, distance_file_name)

@@ -605,6 +605,7 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
         if node == len(vehicle.route)-2: node -= 1
         new_route = vehicle.route[:]
         new_route[node], new_route[node + 1] = new_route[node + 1], new_route[node]
+        new_route = [0] + vehicle.unloaded_route + new_route[1:]
         
         new_vehicle = Vehicle(new_route, orders)
         new_vehicle.load_box_bnb()
