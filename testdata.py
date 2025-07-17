@@ -6,10 +6,8 @@ import random
 import json
 from math import radians, cos, sin, asin, sqrt
 
-
 def make_id(idx):
     return f"D_{idx:05d}"
-
 
 def generate_city_network(total_points=500, seed=None):
     if seed is not None:

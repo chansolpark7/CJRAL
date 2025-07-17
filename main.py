@@ -212,7 +212,7 @@ class Vehicle2D:
         visited = defaultdict(set)
         loading = []
         loading_queue = [deque(), deque()]
-        for index, info in enumerate(self.box_informations): # loading중인 박스 처리 나중에 수정
+        for index, info in enumerate(self.box_informations):
             loading.append(loading_queue[0] + loading_queue[1])
             if info == 0:
                 if len(loading_queue[0]) == 1: loading_queue[0].popleft()
@@ -277,7 +277,7 @@ class Vehicle2D:
                     else:
                         not_shuffling_positions.append(position)
                         not_shuffling_sizes.append(size)
-                if len(not_shuffling_positions) > 0: # 다른 기준?
+                if len(not_shuffling_positions) > 0:
                     best_fit_box_positions = not_shuffling_positions
                     best_fit_box_sizes = not_shuffling_sizes
 

@@ -141,7 +141,7 @@ class Vehicle: # 다른 좌표계 사용
         self.travel_cost = self.dist * 0.5
 
 
-def judge(data_file_name, distance_file_name):
+def judge(data_file_name, distance_file_name, DEBUG=False):
     destinations, name_to_index, index_to_name = main.read_map(data_file_name)
     n = len(destinations)
     OD_matrix = main.read_OD_matrix(n, name_to_index, distance_file_name)
@@ -204,10 +204,11 @@ def judge(data_file_name, distance_file_name):
         car_cost += vehicle.car_cost
         travel_cost += vehicle.travel_cost
         shuffling_cost += vehicle.shuffling_cost
-        print(f'Vehicle {index}')
-        print(vehicle.total_cost)
-        print(vehicle.car_cost, vehicle.travel_cost, vehicle.shuffling_cost)
-        print()
+        if DEBUG:
+            print(f'Vehicle {index}')
+            print(vehicle.total_cost)
+            print(vehicle.car_cost, vehicle.travel_cost, vehicle.shuffling_cost)
+            print()
 
         loaded_box_position_size = []
         for (x, y, z), (size_x, size_y, size_z) in vehicle.loaded_box_position_size:
@@ -217,26 +218,31 @@ def judge(data_file_name, distance_file_name):
         # viwer = visualize.box_viewer_3d(loaded_box_position_size)
         # viwer.show()
 
-    print(f'total cost : {total_cost}')
-    print(f'car cost : {car_cost}')
-    print(f'travel cost : {travel_cost}')
-    print(f'shuffling cost : {shuffling_cost}')
+    if DEBUG:
+        print(f'total cost : {int(total_cost):,}')
+        print(f'car cost : {int(car_cost):,}')
+        print(f'travel cost : {int(travel_cost):,}')
+        print(f'shuffling cost : {int(shuffling_cost):,}')
+
+    return int(total_cost)
 
 if __name__ == "__main__":
     assert basename(os.getcwd()) == 'routing'
 
+    result = []
+
     mode = int(input('mode : '))
-    if mode == 1:
+    if mode == 1: # CJ에서 준 테스트 데이터 파일
         data_file_name = 'Data_Set.json'
         distance_file_name = 'distance-data.txt'
 
         start_t = time.time()
-        result = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
+        ret = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
         running_time = time.time() - start_t
 
         print(f'{running_time=}')
         judge(data_file_name, distance_file_name)
-    elif mode == 2:
+    elif mode == 2: # data 폴더 안에 들어있는 파일
         num = len(os.listdir('data')) // 2
         for i in range(1, num + 1):
             print(f'testing {i}')
@@ -246,11 +252,40 @@ if __name__ == "__main__":
             assert os.path.exists(distance_file_name)
 
             start_t = time.time()
-            result = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
-            if result != 0:
-                print(f'in testing {i} error raised')
-                exit()
+            ret = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
             running_time = time.time() - start_t
+            total_cost = judge(data_file_name, distance_file_name)
 
+            print(ret)
             print(f'{running_time=}')
-            judge(data_file_name, distance_file_name)
+            print(total_cost)
+            result.append((ret, running_time, total_cost))
+    elif mode == 3: # 0.9로 싣는 알고리즘, 0.8로 싣는 알고리즘 비교
+        num = len(os.listdir('data')) // 2
+        for i in range(1, num + 1):
+            print(f'testing {i}')
+            data_file_name = f'data/additional_data_{i:02d}.json'
+            distance_file_name = f'data/additional_distance_data_{i:02d}.txt'
+            assert os.path.exists(data_file_name)
+            assert os.path.exists(distance_file_name)
+
+            start_t = time.time()
+            ret1 = os.system(f'python311 main.py {data_file_name} {distance_file_name}')
+            running_time1 = time.time() - start_t
+
+            try:
+                total_cost1 = judge(data_file_name, distance_file_name)
+            except:
+                total_cost1 = 0
+
+            start_t = time.time()
+            ret2 = os.system(f'python311 prev_main.py {data_file_name} {distance_file_name}')
+            running_time2 = time.time() - start_t
+            try:
+                total_cost2 = judge(data_file_name, distance_file_name)
+            except:
+                total_cost2 = 0
+
+            result.append(((ret1, running_time1, total_cost1), (ret2, running_time2, total_cost2)))
+    
+    print(result)
