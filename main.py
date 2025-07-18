@@ -3,7 +3,6 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 import time
 import math
-import numpy
 import json
 import sys
 import copy
@@ -23,7 +22,7 @@ if DEBUG:
 
     CVRP_TIME_LIMIT = 10
     BOX_LOAD_TIME_LIMIT = 5
-    LOCAL_SEARCH_TIME_LIMIT = 40
+    LOCAL_SEARCH_TIME_LIMIT = 2 * 60
 else:
     CVRP_TIME_LIMIT = 10*60
     BOX_LOAD_TIME_LIMIT = 5
@@ -797,8 +796,14 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
 
     if best_feasible_solution != None:
         return True, best_feasible_solution, []
-    else:
+    elif best_infeasible_solution != None:
         return False, best_infeasible_solution, best_infeasible_solution_unloaded_route
+    else:
+        unloaded_route = []
+        for vehicle in vehicles:
+            unloaded_route += vehicle.unloaded_route
+            vehicle.unloaded_route = []
+        return False, original_vehicles, unloaded_route
 
 def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
     num_vehicles = len(vehicle_capacities)
@@ -849,7 +854,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
 
     return solution, routes
 
-def VRP(n, OD_matrix, orders, min_load_ratio=0.98, max_load_ratio=1.00) -> list[Vehicle]:
+def VRP(n, OD_matrix, orders, min_load_ratio=0.95, max_load_ratio=1.00) -> list[Vehicle]:
     demands = [0] * n
     for i in range(1, n):
         for order in orders[i]:
@@ -936,7 +941,6 @@ def main(data_filename, distance_filename):
     success, vehicles, unloaded_route = feasible_solution_local_search(vehicles, OD_matrix, orders, start_t + CVRP_TIME_LIMIT)
     print(f'local search time : {time.time() - start_t}\n')
     print(f'{success = }')
-    print(vehicles)
 
     if success:
         pass
