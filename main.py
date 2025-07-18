@@ -14,8 +14,8 @@ Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 # Distance = namedtuple('Distance', ['time', 'meter'])
 
-DEBUG = False
-LOCAL_SEARCH_DEPTH_LIMIT = 6
+DEBUG = True
+LOCAL_SEARCH_DEPTH_LIMIT = 8
 INTERNAL_OPTIMIZATION_THRESHOLD = 0.05
 
 if DEBUG:
@@ -23,7 +23,7 @@ if DEBUG:
 
     CVRP_TIME_LIMIT = 10
     BOX_LOAD_TIME_LIMIT = 5
-    LOCAL_SEARCH_TIME_LIMIT = 150
+    LOCAL_SEARCH_TIME_LIMIT = 40
 else:
     CVRP_TIME_LIMIT = 10*60
     BOX_LOAD_TIME_LIMIT = 5
@@ -616,6 +616,12 @@ class Vehicle:
             self.box_num = self.loaded_box_num
 
 def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, orders, start_t): # LS
+    best_feasible_solution = None
+    best_feasible_solution_cost = 1e9
+
+    best_infeasible_solution = None
+    best_infeasible_solution_unloaded_route = []
+
     def internal_optimization(vehicle: Vehicle):
         for box_index in range(vehicle.loaded_box_num-1, -1, -1):
             if (vehicle.data_empty_volume[box_index+1] - vehicle.data_possible_volume[box_index+1]) / vehicle.total_volume < INTERNAL_OPTIMIZATION_THRESHOLD:
@@ -679,13 +685,69 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
                 unloaded_route.append(node)
         return unloaded_route
 
+    def judge(vehicles: list[Vehicle]):
+        car_cost = 0
+        travel_cost = 0
+        shuffling_cost = 0
+        def move_box(vehicle: Vehicle, moved: set, used, box, exclude):
+            nonlocal shuffling_cost
+
+            position, size = vehicle.loaded_box_position_size[box]
+            x, y, z = position
+            size_x, size_y, size_z = size
+            y = 28 - (y + size_y)
+            for target_z in range(z+size_z, Vehicle.Z):
+                for dx in range(size_x):
+                    for dy in range(size_y):
+                        other_box = used[x+dx][y+dy][target_z]
+                        if other_box == None: continue
+                        if other_box not in moved:
+                            if other_box >= exclude: continue
+                            shuffling_cost += 500
+                            moved.add(other_box)
+                            move_box(vehicle, moved, used, other_box, exclude)
+            for target_y in range(y-1, -1, -1):
+                for dx in range(size_x):
+                    for dz in range(size_z):
+                        other_box = used[x+dx][target_y][z+dz]
+                        if other_box == None: continue
+                        if other_box not in moved:
+                            if other_box >= exclude: continue
+                            shuffling_cost += 500
+                            moved.add(other_box)
+                            move_box(vehicle, moved, used, other_box, exclude)
+
+        for vehicle in vehicles:
+            car_cost += 150000
+            travel_cost += int(vehicle.calculate_dist(OD_matrix) * 0.5)
+            used = [[[None]*Vehicle.Z for _ in range(Vehicle.Y)] for _ in range(Vehicle.X)]
+            for i, (position, size) in enumerate(vehicle.loaded_box_position_size):
+                x, y, z = position
+                size_x, size_y, size_z = size
+                y = 28 - (y + size_y)
+                for dx in range(size_x):
+                    for dy in range(size_y):
+                        for dz in range(size_z):
+                            assert used[x+dx][y+dy][z+dz] == None
+                            used[x+dx][y+dy][z+dz] = i
+            for i in range(vehicle.loaded_box_num-1, -1):
+                moved = set()
+                move_box(vehicle, moved, used, i, i)
+        return car_cost + travel_cost + shuffling_cost
+
     def dfs(depth):
         nonlocal vehicles
+        nonlocal best_infeasible_solution
+        nonlocal best_infeasible_solution_unloaded_route
+
         if depth == LOCAL_SEARCH_DEPTH_LIMIT:
             unloaded_route = apply_greedy_loading(vehicles)
-            if unloaded_route: return False
+            if unloaded_route:
+                if best_infeasible_solution == None or len(best_infeasible_solution_unloaded_route) > len(unloaded_route):
+                    best_infeasible_solution = copy.deepcopy(vehicles)
+                    best_infeasible_solution_unloaded_route = unloaded_route
+                return False
             else:
-                print('greedy applied')
                 return True
 
         if time.time() - start_t > LOCAL_SEARCH_TIME_LIMIT: return False
@@ -707,18 +769,14 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
 
         # queue.sort(key=lambda x: x[:2], reverse=True) ##### 선택 기준?
         random.shuffle(queue)
-        print(f'depth : {depth}')
-        vehicle_status(vehicles)
+        # vehicle_status(vehicles)
         for index, (_, ls_type, vehicle_index) in enumerate(queue):
             if index != len(queue)-1 and random.random() < 0.4: continue
             if ls_type == 0:
-                print('internal optimization')
                 vehicle = vehicles[vehicle_index]
                 new_vehicle = internal_optimization(vehicle)
-                print(vehicle.loaded_box_num,  new_vehicle.loaded_box_num)
                 vehicles[vehicle_index] = new_vehicle
             else:
-                print('reassign destination')
                 reassign_destination(vehicles, vehicle_index)
             break
 
@@ -729,11 +787,18 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
     while time.time() - start_t < LOCAL_SEARCH_TIME_LIMIT:
         print(f'dfs {i}')
         if dfs(0):
-            return True, vehicles
+            cost = judge(vehicles)
+            print(cost)
+            if cost < best_feasible_solution_cost:
+                best_feasible_solution_cost = cost
+                best_feasible_solution = copy.deepcopy(vehicles)
         vehicles = copy.deepcopy(original_vehicles)
         i += 1
 
-    return False, original_vehicles
+    if best_feasible_solution != None:
+        return True, best_feasible_solution, []
+    else:
+        return False, best_infeasible_solution, best_infeasible_solution_unloaded_route
 
 def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
     num_vehicles = len(vehicle_capacities)
@@ -784,7 +849,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
 
     return solution, routes
 
-def VRP(n, OD_matrix, orders, min_load_ratio=0.9, max_load_ratio=0.95) -> list[Vehicle]:
+def VRP(n, OD_matrix, orders, min_load_ratio=0.98, max_load_ratio=1.00) -> list[Vehicle]:
     demands = [0] * n
     for i in range(1, n):
         for order in orders[i]:
@@ -855,7 +920,7 @@ def main(data_filename, distance_filename):
     print(f'read file time : {time.time() - start_t}\n')
 
     print('start VRP')
-    vehicles = VRP(n, OD_matrix, orders, 0.90, 0.95)
+    vehicles = VRP(n, OD_matrix, orders, 0.95, 1)
     print(f'VRP time : {time.time() - start_t}\n')
 
     print('start load box')
@@ -868,9 +933,15 @@ def main(data_filename, distance_filename):
         #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
 
     print('start local search')
-    success, vehicles = feasible_solution_local_search(vehicles, OD_matrix, orders, start_t + CVRP_TIME_LIMIT)
-    print(f'{success = }')
+    success, vehicles, unloaded_route = feasible_solution_local_search(vehicles, OD_matrix, orders, start_t + CVRP_TIME_LIMIT)
     print(f'local search time : {time.time() - start_t}\n')
+    print(f'{success = }')
+    print(vehicles)
+
+    if success:
+        pass
+    else:
+        pass
 
     if DEBUG:
         vehicle_status(vehicles)

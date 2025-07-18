@@ -254,8 +254,10 @@ if __name__ == "__main__":
     mode = int(input('mode : '))
     result = []
     if mode == 1: # CJ에서 준 테스트 데이터 파일
-        data_file_name = 'Data_Set.json'
-        distance_file_name = 'distance-data.txt'
+        # data_file_name = 'Data_Set.json'
+        # distance_file_name = 'distance-data.txt'
+        data_file_name = 'data/additional_data_05.json'
+        distance_file_name = 'data/additional_distance_data_05.txt'
 
         ret, running_time, total_cost, msg = run_test(f'python311 main.py {data_file_name} {distance_file_name}')
 
