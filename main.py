@@ -20,7 +20,7 @@ INTERNAL_OPTIMIZATION_THRESHOLD = 0.03
 if DEBUG:
     import visualize
 
-    CVRP_TIME_LIMIT = 10
+    CVRP_TIME_LIMIT = 30
     BOX_LOAD_TIME_LIMIT = 5
     LOCAL_SEARCH_TIME_LIMIT = 2 * 60
 else:
@@ -808,7 +808,7 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
             vehicle.unloaded_route = []
         return False, original_vehicles, unloaded_route
 
-def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
+def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, time_limit, depot=0):
     num_vehicles = len(vehicle_capacities)
     manager = pywrapcp.RoutingIndexManager(len(matrix), num_vehicles, depot)
     routing = pywrapcp.RoutingModel(manager)
@@ -838,7 +838,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
-    search_parameters.time_limit.seconds = CVRP_TIME_LIMIT
+    search_parameters.time_limit.seconds = time_limit
     # search_parameters.log_search = True
 
     solution = routing.SolveWithParameters(search_parameters)
@@ -874,11 +874,23 @@ def VRP(n, OD_matrix, orders, min_load_ratio=0.90, max_load_ratio=0.95) -> list[
     if DEBUG: print(f'vehicle num : {min_vehicle_num} ~ {max_vehicle_num}')
     vehicle_count = max_vehicle_num
     if vehicle_count < 3: vehicle_count += 1
+
+    total_time = 0
+    while True:
+        time_limit = int(max(10, min(30, (CVRP_TIME_LIMIT-total_time) * 0.3)))
+        vehicle_capacities = [int(Vehicle.total_volume*max_load_ratio)] * vehicle_count
+        solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, time_limit, depot=0)
+        if not routes:
+            vehicle_count += 1
+            total_time += time_limit
+        else: break
+
+    temp = routes
     vehicle_capacities = [int(Vehicle.total_volume*max_load_ratio)] * vehicle_count
+    solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, min(30, CVRP_TIME_LIMIT - total_time), depot=0)
+    if not routes: routes = temp
 
-    solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, depot=0)
-
-    assert routes #####
+    if DEBUG: print(f'used {vehicle_count} vehicles')
 
     vehicles = []
     for route in routes:
@@ -975,8 +987,8 @@ def main(data_filename, distance_filename):
 # python311 main.py additional_data.json additional_distance_data.txt
 if __name__ == '__main__':
     data_filename, distance_filename = sys.argv[1:]
-    try:
-        main(data_filename, distance_filename)
-    except Exception as reason:
-        print(reason)
-        exit(1)
+    main(data_filename, distance_filename)
+    # try:
+    # except Exception as reason:
+    #     print(reason)
+    #     exit(1)

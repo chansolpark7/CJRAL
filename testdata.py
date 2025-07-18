@@ -197,7 +197,7 @@ if __name__ == "__main__":
     assert basename(os.getcwd()) == 'routing'
     os.makedirs("data", exist_ok=True)
 
-    place_list = [random.randint(200, 500) for _ in range(5)]  # 5개 데이터 생성
+    place_list = [random.randint(200, 500) for _ in range(10)]
     print(f"장소 수 리스트: {place_list}")
 
     for idx, total_delivery_points in enumerate(place_list):
