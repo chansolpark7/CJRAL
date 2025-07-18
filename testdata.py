@@ -85,7 +85,7 @@ def generate_city_network(total_points=500, seed=None):
     return delivery_points, main_city_coords, road_lines
 
 
-def convert_to_json(delivery_points, filename):
+def convert_to_json(delivery_points, filename, box_range):
     base_x, base_y = 500, 500
     base_lon, base_lat = 129.0750875, 35.17982005
     scale = 0.0002
@@ -112,7 +112,7 @@ def convert_to_json(delivery_points, filename):
     order_number = 1
     box_number = 1
     for dest in destinations:
-        num_boxes = random.randint(1, 5)
+        num_boxes = random.randint(*box_range)
         for _ in range(num_boxes):
             size = random.choice(box_sizes)
             orders.append({
@@ -197,17 +197,26 @@ if __name__ == "__main__":
     assert basename(os.getcwd()) == 'routing'
     os.makedirs("data", exist_ok=True)
 
-    place_list = [random.randint(200, 500) for _ in range(10)]
-    print(f"장소 수 리스트: {place_list}")
+    # place_list = [random.randint(200, 500) for _ in range(10)]
+    place_num_list = [200, 300, 500, 600]
+    box_range_list = [(1, 2), (1, 6), (3, 7)]
 
-    for idx, total_delivery_points in enumerate(place_list):
+    data = []
+    for place_num in place_num_list:
+        offset = random.randint(-30, 30)
+        for box_range in box_range_list:
+            data.append((place_num + offset, box_range))
+
+    print(f"장소 수 리스트: {place_num_list}")
+
+    for idx, (total_delivery_points, box_range) in enumerate(data):
         points, mains, roads = generate_city_network(total_delivery_points, seed=None)
 
         json_filename = f"data/additional_data_{idx+1:02d}.json"
         txt_filename = f"data/additional_distance_data_{idx+1:02d}.txt"
 
-        convert_to_json(points, filename=json_filename)
-        export_distance_table(points, filename=txt_filename)
+        convert_to_json(points, json_filename, box_range)
+        export_distance_table(points, txt_filename)
 
         print(f"[✅] Saved: {json_filename}")
         print(f"[✅] Saved: {txt_filename}")

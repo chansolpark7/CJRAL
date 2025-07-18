@@ -250,11 +250,11 @@ def benchmark(result):
     plt.tight_layout()
     plt.show()
 
-def plot_vrp(data_file_name, distance_file_name):
-    destinations, name_to_index, index_to_name = main.read_map(data_file_name)
+def plot_vrp(data_filename, distance_filename):
+    destinations, name_to_index, index_to_name = main.read_map(data_filename)
     n = len(destinations)
-    OD_matrix = main.read_OD_matrix(n, name_to_index, distance_file_name)
-    orders = main.read_orders(n, name_to_index, data_file_name)
+    OD_matrix = main.read_OD_matrix(n, name_to_index, distance_filename)
+    orders = main.read_orders(n, name_to_index, data_filename)
 
     result_file_name = 'Result.xlsx'
     wb = openpyxl.load_workbook(result_file_name)
@@ -321,11 +321,11 @@ def plot_vrp(data_file_name, distance_file_name):
     plt.show()
 
 if __name__ == "__main__":
-    data_file_name = 'Data_Set.json'
-    distance_file_name = 'distance-data.txt'
-    # data_file_name = 'additional_data.json'
-    # distance_file_name = 'additional_distance_data.txt'
+    data_filename = 'Data_Set.json'
+    distance_filename = 'distance-data.txt'
+    # data_filename = 'additional_data.json'
+    # distance_filename = 'additional_distance_data.txt'
 
     
 
-    plot_vrp(data_file_name, distance_file_name)
+    plot_vrp(data_filename, distance_filename)

@@ -11,15 +11,13 @@ from collections import defaultdict, namedtuple, deque
 
 Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
-# Distance = namedtuple('Distance', ['time', 'meter'])
 
 DEBUG = True
+VISUALIZE = False
 LOCAL_SEARCH_DEPTH_LIMIT = 8
-INTERNAL_OPTIMIZATION_THRESHOLD = 0.03
+INTERNAL_OPTIMIZATION_THRESHOLD = 0.05
 
 if DEBUG:
-    import visualize
-
     CVRP_TIME_LIMIT = 30
     BOX_LOAD_TIME_LIMIT = 5
     LOCAL_SEARCH_TIME_LIMIT = 2 * 60
@@ -27,6 +25,9 @@ else:
     CVRP_TIME_LIMIT = 10*60
     BOX_LOAD_TIME_LIMIT = 5
     LOCAL_SEARCH_TIME_LIMIT = 5 * 60
+
+if VISUALIZE:
+    import visualize
 
 box_size = [
     [30, 40, 30],
@@ -206,6 +207,7 @@ class Vehicle2D:
                         best_fit_size = size
                         best_fit_position = position
                         best_fit_possible_volume = possible_volume
+
             if best_fit_position != None:
                 self.load_box_at(best_fit_position, best_fit_size)
                 self.loaded_box_position_size.append((best_fit_position, best_fit_size))
@@ -239,6 +241,7 @@ class Vehicle2D:
                     volume += self.box_volumes[info]
                 else:
                     break
+
             return volume
         
         def dfs(index, volume):
@@ -275,6 +278,7 @@ class Vehicle2D:
                     if volume + box_volume > answer_volume:
                         answer_volume = volume + box_volume
                         answer_loaded_box_position_size = self.loaded_box_position_size + [(position, size)]
+
             if best_fit_possible_volume != -1:
                 not_shuffling_positions = []
                 not_shuffling_sizes = []
@@ -626,6 +630,7 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
         for box_index in range(vehicle.loaded_box_num-1, -1, -1):
             if (vehicle.data_empty_volume[box_index+1] - vehicle.data_possible_volume[box_index+1]) / vehicle.total_volume < INTERNAL_OPTIMIZATION_THRESHOLD:
                 break
+
         node = vehicle.box_route_index[box_index]
         if node == len(vehicle.route)-2: return
 
@@ -686,12 +691,14 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
                 if vehicle.load_box_greedy(node, orders): break
             else:
                 unloaded_route.append(node)
+
         return unloaded_route
 
     def judge(vehicles: list[Vehicle]):
         car_cost = 0
         travel_cost = 0
         shuffling_cost = 0
+
         def move_box(vehicle: Vehicle, moved: set, used, box, exclude):
             nonlocal shuffling_cost
 
@@ -731,11 +738,12 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
                 for dx in range(size_x):
                     for dy in range(size_y):
                         for dz in range(size_z):
-                            assert used[x+dx][y+dy][z+dz] == None
                             used[x+dx][y+dy][z+dz] = i
+
             for i in range(vehicle.loaded_box_num-1, -1):
                 moved = set()
                 move_box(vehicle, moved, used, i, i)
+
         return car_cost + travel_cost + shuffling_cost
 
     def dfs(depth):
@@ -768,9 +776,9 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
 
             # 1
             if len(vehicle.unloaded_route) != 0:
-                queue.append((0, 1, index)) ##### 가중치 결정?
+                queue.append((0, 1, index)) ##### 가중치
 
-        # queue.sort(key=lambda x: x[:2], reverse=True) ##### 선택 기준?
+        # queue.sort(key=lambda x: x[:2], reverse=True) ##### 선택 기준
         random.shuffle(queue)
         # vehicle_status(vehicles)
         for index, (_, ls_type, vehicle_index) in enumerate(queue):
@@ -873,21 +881,21 @@ def VRP(n, OD_matrix, orders, min_load_ratio=0.90, max_load_ratio=0.95) -> list[
     min_vehicle_num, max_vehicle_num = math.ceil(min_vehicle_num), math.ceil(max_vehicle_num)
     if DEBUG: print(f'vehicle num : {min_vehicle_num} ~ {max_vehicle_num}')
     vehicle_count = max_vehicle_num
-    if vehicle_count < 3: vehicle_count += 1
 
     total_time = 0
     while True:
-        time_limit = int(max(10, min(30, (CVRP_TIME_LIMIT-total_time) * 0.3)))
+        time_limit = int(max(10, min(30, (CVRP_TIME_LIMIT-total_time) * 0.2)))
         vehicle_capacities = [int(Vehicle.total_volume*max_load_ratio)] * vehicle_count
         solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, time_limit, depot=0)
+        total_time += time_limit
         if not routes:
             vehicle_count += 1
-            total_time += time_limit
-        else: break
+        else:
+            break
 
     temp = routes
     vehicle_capacities = [int(Vehicle.total_volume*max_load_ratio)] * vehicle_count
-    solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, min(30, CVRP_TIME_LIMIT - total_time), depot=0)
+    solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, max(30, CVRP_TIME_LIMIT - total_time), depot=0)
     if not routes: routes = temp
 
     if DEBUG: print(f'used {vehicle_count} vehicles')
@@ -950,8 +958,9 @@ def main(data_filename, distance_filename):
     
     if DEBUG:
         vehicle_status(vehicles)
-        # for vehicle in vehicles:
-        #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
+    if VISUALIZE:
+        for vehicle in vehicles:
+            visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
 
     print('start local search')
     success, vehicles, unloaded_route = feasible_solution_local_search(vehicles, OD_matrix, orders, start_t + CVRP_TIME_LIMIT)
@@ -972,10 +981,11 @@ def main(data_filename, distance_filename):
         vehicles.append(vehicle)
         print(f'not success : {time.time() - t}')
 
-    if DEBUG:
+    if VISUALIZE:
         vehicle_status(vehicles)
-        # for vehicle in vehicles:
-        #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
+        for vehicle in vehicles:
+            visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
+        visualize.plot_vrp(data_filename, distance_filename)
 
     save(vehicles, destinations, orders, index_to_name)
 
@@ -985,10 +995,11 @@ def main(data_filename, distance_filename):
 
 # python311 main.py Data_Set.json distance-data.txt
 # python311 main.py additional_data.json additional_distance_data.txt
+
 if __name__ == '__main__':
     data_filename, distance_filename = sys.argv[1:]
-    main(data_filename, distance_filename)
-    # try:
-    # except Exception as reason:
-    #     print(reason)
-    #     exit(1)
+    try:
+        main(data_filename, distance_filename)
+    except Exception as reason:
+        print(reason)
+        exit(1)

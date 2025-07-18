@@ -264,8 +264,8 @@ if __name__ == "__main__":
     if mode == 1: # CJ에서 준 테스트 데이터 파일
         # data_file_name = 'Data_Set.json'
         # distance_file_name = 'distance-data.txt'
-        data_file_name = 'data/additional_data_07.json'
-        distance_file_name = 'data/additional_distance_data_07.txt'
+        data_file_name = 'data/additional_data_05.json'
+        distance_file_name = 'data/additional_distance_data_05.txt'
 
         ret, running_time, total_cost, msg = run_test(f'{python} main.py {data_file_name} {distance_file_name}')
 
@@ -276,6 +276,7 @@ if __name__ == "__main__":
             print()
 
         result.append(((ret, running_time, total_cost, msg),))
+        if VISUALIZE and (ret == 0 or ret > 128): visualize.plot_vrp(data_file_name, distance_file_name)
     elif mode == 2: # data 폴더 안에 들어있는 파일
         num = len(os.listdir('data')) // 2
         for i in range(1, num + 1):
@@ -295,7 +296,7 @@ if __name__ == "__main__":
                 print()
 
             result.append(((ret, running_time, total_cost, msg),))
-            if VISUALIZE and ret == 0: visualize.plot_vrp(data_file_name, distance_file_name)
+            if VISUALIZE and (ret == 0 or ret > 128): visualize.plot_vrp(data_file_name, distance_file_name)
     elif mode == 3: # 0.9로 싣는 알고리즘, 0.8로 싣는 알고리즘 비교
         num = len(os.listdir('data')) // 2
         for i in range(1, num + 1):
