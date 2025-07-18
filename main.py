@@ -944,6 +944,7 @@ def main(data_filename, distance_filename):
     print(f'{success = }')
 
     if not success:
+        count = 1
         vehicle = Vehicle([0, 0], orders)
         while unloaded_route:
             node = unloaded_route.pop()
@@ -951,6 +952,7 @@ def main(data_filename, distance_filename):
                 vehicles.append(vehicle)
                 vehicle = Vehicle([0, 0], orders)
                 vehicle.load_box_greedy(node, orders)
+                count += 1
         vehicles.append(vehicle)
 
     if DEBUG:
@@ -962,7 +964,7 @@ def main(data_filename, distance_filename):
 
     if DEBUG:
         if success: exit(0)
-        else: exit(1)
+        else: exit(128 + count)
 
 # python311 main.py Data_Set.json distance-data.txt
 # python311 main.py additional_data.json additional_distance_data.txt
