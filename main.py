@@ -12,7 +12,7 @@ from collections import defaultdict, namedtuple, deque
 Point = namedtuple('Point', ['longitude', 'latitude'])
 Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 
-DEBUG = True
+DEBUG = False
 VISUALIZE = False
 LOCAL_SEARCH_DEPTH_LIMIT = 8
 INTERNAL_OPTIMIZATION_THRESHOLD = 0.05
