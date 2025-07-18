@@ -854,7 +854,7 @@ def solve_vrp_with_capacity(matrix, demands, vehicle_capacities, depot=0):
 
     return solution, routes
 
-def VRP(n, OD_matrix, orders, min_load_ratio=0.95, max_load_ratio=1.00) -> list[Vehicle]:
+def VRP(n, OD_matrix, orders, min_load_ratio=0.90, max_load_ratio=0.95) -> list[Vehicle]:
     demands = [0] * n
     for i in range(1, n):
         for order in orders[i]:
@@ -870,6 +870,7 @@ def VRP(n, OD_matrix, orders, min_load_ratio=0.95, max_load_ratio=1.00) -> list[
     min_vehicle_num, max_vehicle_num = math.ceil(min_vehicle_num), math.ceil(max_vehicle_num)
     if DEBUG: print(f'vehicle num : {min_vehicle_num} ~ {max_vehicle_num}')
     vehicle_count = max_vehicle_num
+    if vehicle_count < 3: vehicle_count += 1
     vehicle_capacities = [int(Vehicle.total_volume*max_load_ratio)] * vehicle_count
 
     solution, routes = solve_vrp_with_capacity(OD_matrix, demands, vehicle_capacities, depot=0)
@@ -942,21 +943,33 @@ def main(data_filename, distance_filename):
     print(f'local search time : {time.time() - start_t}\n')
     print(f'{success = }')
 
-    if success:
-        pass
-    else:
-        pass
+    if not success:
+        vehicle = Vehicle([0, 0], orders)
+        while unloaded_route:
+            node = unloaded_route.pop()
+            if not vehicle.load_box_greedy(node, orders):
+                vehicles.append(vehicle)
+                vehicle = Vehicle([0, 0], orders)
+                vehicle.load_box_greedy(node, orders)
+        vehicles.append(vehicle)
 
     if DEBUG:
         vehicle_status(vehicles)
         # for vehicle in vehicles:
         #     visualize.graph(possible=vehicle.data_possible_volume, empty=vehicle.data_empty_volume)
 
-    if not success: exit(1)
     save(vehicles, destinations, orders, index_to_name)
+
+    if DEBUG:
+        if success: exit(0)
+        else: exit(1)
 
 # python311 main.py Data_Set.json distance-data.txt
 # python311 main.py additional_data.json additional_distance_data.txt
 if __name__ == '__main__':
     data_filename, distance_filename = sys.argv[1:]
-    main(data_filename, distance_filename)
+    try:
+        main(data_filename, distance_filename)
+    except Exception as reason:
+        print(reason)
+        exit(2)

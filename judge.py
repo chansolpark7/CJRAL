@@ -235,16 +235,17 @@ def run_test(command):
     running_time = time.time() - start_t
 
     msg = ''
-    if ret == 0:
+    if ret == 1:
+        msg = 'error raised in main'
+        total_cost = 0
+    else:
         try:
             total_cost = judge(data_file_name, distance_file_name)
         except Exception as reason:
             total_cost = 0
+            ret = 2
             msg = str(reason)
             print(reason)
-    else:
-        msg = 'error raised in main'
-        total_cost = 0
 
     return ret, running_time, total_cost, msg
 
@@ -306,9 +307,24 @@ if __name__ == "__main__":
     n = len(result[0])
     data = []
     for i in range(n):
-        for j, d in enumerate(result):
+        for j, d in enumerate(result, 1):
             status = d[i][0]
-            if status != 0:
-                print(f'Failed in test case {j+1} : {d[i][3]}')
+            if status == 0:
+                print(f'Test case {j} execution succeeded')
+            elif status == 1:
+                print(f'Failed in test case {j} by main : {d[i][3]}')
+            elif status == 2:
+                print(f'Failed in test case {j} by judge : {d[i][3]}')
+            elif status > 128:
+                print(f'In test case {j}, main uses {status - 128} additional vehicles')
+            else:
+                print(f'unknown status {status} in test case {j}')
+
     print(result)
     visualize.benchmark(result)
+
+# ret value
+# 0 : 실행 성공
+# 1 : main에서 실행 실패
+# 2 : judge 파일 오류
+# 129 ~ : main에서 차량을 추가적으로 사용함
