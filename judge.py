@@ -231,8 +231,14 @@ def judge(data_file_name, distance_file_name):
 
 def run_test(command):
     start_t = time.time()
-    ret = os.system(command)
-    running_time = time.time() - start_t
+    try:
+        ret = os.system(command)
+        running_time = time.time() - start_t
+    except KeyboardInterrupt:
+        ret = 3
+        running_time = 0
+        total_cost = 0
+        return ret, running_time, total_cost, ''
 
     msg = ''
     if ret == 1:
@@ -315,6 +321,8 @@ if __name__ == "__main__":
                 print(f'Failed in test case {j} by main : {d[i][3]}')
             elif status == 2:
                 print(f'Failed in test case {j} by judge : {d[i][3]}')
+            elif status == 3:
+                print(f'keyboard interrupt in test case {j}')
             elif status > 128:
                 print(f'In test case {j}, main uses {status - 128} additional vehicles')
             else:
@@ -327,4 +335,5 @@ if __name__ == "__main__":
 # 0 : 실행 성공
 # 1 : main에서 실행 실패
 # 2 : judge 파일 오류
+# 3 : keyboard interrupt
 # 129 ~ : main에서 차량을 추가적으로 사용함
