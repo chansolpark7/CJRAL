@@ -15,7 +15,7 @@ Order = namedtuple('Order', ['order_num', 'box_id', 'destination', 'info'])
 
 DEBUG = True
 LOCAL_SEARCH_DEPTH_LIMIT = 8
-INTERNAL_OPTIMIZATION_THRESHOLD = 0.05
+INTERNAL_OPTIMIZATION_THRESHOLD = 0.03
 
 if DEBUG:
     import visualize
@@ -621,19 +621,23 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
     best_infeasible_solution = None
     best_infeasible_solution_unloaded_route = []
 
-    def internal_optimization(vehicle: Vehicle):
+    def internal_optimization(vehicles: list[Vehicle], target_vehicle_index):
+        vehicle = vehicles[target_vehicle_index]
         for box_index in range(vehicle.loaded_box_num-1, -1, -1):
             if (vehicle.data_empty_volume[box_index+1] - vehicle.data_possible_volume[box_index+1]) / vehicle.total_volume < INTERNAL_OPTIMIZATION_THRESHOLD:
                 break
         node = vehicle.box_route_index[box_index]
-        if node == len(vehicle.route)-2: node -= 1
+        if node == len(vehicle.route)-2: return
+
         new_route = vehicle.route[:]
-        new_route[node], new_route[node + 1] = new_route[node + 1], new_route[node]
+        offset = random.randint(1, min(6, len(new_route)-node-2))
+        for i in range(node, node + offset):
+            new_route[i], new_route[i + 1] = new_route[i + 1], new_route[i]
         new_route = [0] + vehicle.unloaded_route + new_route[1:]
         
         new_vehicle = Vehicle(new_route, orders)
         new_vehicle.load_box_bnb()
-        return new_vehicle
+        vehicles[target_vehicle_index] = new_vehicle
 
     def reassign_destination(vehicles: list[Vehicle], target_vehicle_index):
         min_ratio_vehicle_index = None
@@ -773,8 +777,7 @@ def feasible_solution_local_search(original_vehicles: list[Vehicle], OD_matrix, 
             if index != len(queue)-1 and random.random() < 0.4: continue
             if ls_type == 0:
                 vehicle = vehicles[vehicle_index]
-                new_vehicle = internal_optimization(vehicle)
-                vehicles[vehicle_index] = new_vehicle
+                internal_optimization(vehicles, vehicle_index)
             else:
                 reassign_destination(vehicles, vehicle_index)
             break
@@ -926,7 +929,7 @@ def main(data_filename, distance_filename):
     print(f'read file time : {time.time() - start_t}\n')
 
     print('start VRP')
-    vehicles = VRP(n, OD_matrix, orders, 0.95, 1)
+    vehicles = VRP(n, OD_matrix, orders, 0.95, 0.95)
     print(f'VRP time : {time.time() - start_t}\n')
 
     print('start load box')
@@ -944,6 +947,7 @@ def main(data_filename, distance_filename):
     print(f'{success = }')
 
     if not success:
+        t = time.time()
         count = 1
         vehicle = Vehicle([0, 0], orders)
         while unloaded_route:
@@ -954,6 +958,7 @@ def main(data_filename, distance_filename):
                 vehicle.load_box_greedy(node, orders)
                 count += 1
         vehicles.append(vehicle)
+        print(f'not success : {time.time() - t}')
 
     if DEBUG:
         vehicle_status(vehicles)
@@ -974,4 +979,4 @@ if __name__ == '__main__':
         main(data_filename, distance_filename)
     except Exception as reason:
         print(reason)
-        exit(2)
+        exit(1)

@@ -525,22 +525,23 @@ class Vehicle:
             self.box_num = self.loaded_box_num
 
 
-def internal_optimization(vehicle: Vehicle, orders):
-    # print(len(vehicle.data_empty_volume), vehicle.loaded_box_num)
+def internal_optimization(vehicles: list[Vehicle], target_vehicle_index, orders):
+    vehicle = vehicles[target_vehicle_index]
     for box_index in range(vehicle.loaded_box_num-1, -1, -1):
         if (vehicle.data_empty_volume[box_index+1] - vehicle.data_possible_volume[box_index+1]) / vehicle.total_volume < INTERNAL_OPTIMIZATION_THRESHOLD:
             break
-    print(f'{box_index = }')
     node = vehicle.box_route_index[box_index]
-    if node == len(vehicle.route)-2: node -= 1
+    if node == len(vehicle.route)-2: return
+
     new_route = vehicle.route[:]
-    # new_route[node], new_route[node + 12] = new_route[node + 12], new_route[node]
-    # new_route[node-6:node+6] = new_route[node-6:node+6][::-1]
-    print(new_route, node)
+    offset = random.randint(1, min(6, len(new_route)-node-2))
+    for i in range(node, node + offset):
+        new_route[i], new_route[i + 1] = new_route[i + 1], new_route[i]
+    new_route = [0] + vehicle.unloaded_route + new_route[1:]
     
     new_vehicle = Vehicle(new_route, orders)
     new_vehicle.load_box_bnb()
-    return new_vehicle
+    vehicles[target_vehicle_index] = new_vehicle
 
 def reassign_destination(vehicles: list[Vehicle], target_vehicle_index, orders):
     min_ratio_vehicle_index = None
@@ -595,8 +596,8 @@ def apply_greedy_loading(vehicles: list[Vehicle], orders):
 def random_boxes(n):
     boxes = []
     for _ in range(n):
-        boxes.append(random.randint(0, 2))
-        # boxes.append(random.choices([0, 1, 2], weights=[1/5, 2/5, 2/5])[0])
+        # boxes.append(random.randint(0, 2))
+        boxes.append(random.choices([0, 1, 2], weights=[1/5, 2/5, 2/5])[0])
     return boxes
 
 def run():
@@ -651,19 +652,23 @@ def run():
     n = 70
     route = [0] + [i for i in range(1, n+1)] + [0]
     orders = [[]] + [random_boxes(random.randint(1, 2)) for i in range(n)] + [[]]
-    # route = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 0]
-    # orders = [[], [2], [1], [1], [0, 1], [2, 0], [1], [1, 1], [2], [2], [0, 2], [1, 2], [1], [2, 2], [2], [1], [1, 2], [1], [0], [2, 2], [2, 1], [0, 0], [1], [0, 2], [1], [2], [0], [1], [1, 2], [0], [0], [2], [2, 2], [2, 0], [1, 1], [1, 0], [2, 1], [2, 0], [2, 1], [1, 1], [2], [2], [0], [0], [1, 1], [2], [1, 0], [1, 2], [1, 2], [1], [0], [1], [0, 0], [2, 1], [0, 0], [2, 0], [0], [2, 2], [1, 0], [1], [2, 2], [0], [0, 0], [1], [1], [2, 0], [2, 0], [2], [1], [1, 1], [1], []]
+    route = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 0]
+    orders = [[], [2], [0], [2], [2, 2], [0, 2], [2], [0, 1], [1, 1], [1, 0], [1, 2], [0], [1], [1], [2], [2], [1], [2, 0], [0], [1], [2], [2], [1, 2], [1, 2], [1, 1], [1, 2], [0], [2, 2], [0], [1, 2], [2], [0], [2, 1], [1], [1], [0], [2, 1], [2, 0], [1], [2, 2], [1, 1], [2, 1], [1, 2], [0], [2], [2, 2], [2, 2], [2, 0], [2], [2, 1], [2, 1], [0, 1], [2], [2], [1, 0], [0], [1], [2, 1], [2, 1], [2], [0], [1], [0], [1], [1], [2, 1], [0, 2], [2, 2], [1], [2, 0], [2, 2], []]
     print(route)
     print(orders)
+    print()
     v = Vehicle(route, orders)
     v.load_box_bnb()
 
+    vehicles = [v]
     print(v.unloaded_route)
+    print(v.route)
     visualize.box_viewer_3d(v.loaded_box_position_size).show()
-
-    if v.unloaded_route:
-        unloaded_route = apply_greedy_loading([v], orders)
-        print(unloaded_route)
+    if len(v.route) > 3 and (v.data_empty_volume[-1] - v.data_possible_volume[-1]) / v.total_volume > INTERNAL_OPTIMIZATION_THRESHOLD:
+        internal_optimization(vehicles, 0, orders)
+        v = vehicles[0]
+        print(v.unloaded_route)
+        print(v.route)
 
         visualize.box_viewer_3d(v.loaded_box_position_size).show()
     
